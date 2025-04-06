@@ -26,6 +26,7 @@ pre_defined_content = [
     "Answer in minimum words as possible with reasoning",
     "You are a Scientific research student. Rephrase this sentence to avoid plagiarism",
     "Check the grammar and rephrase if required. You are also allowed to improvise",
+    "You are a helpful assistant"
 ]
 
 my_content = st.selectbox(
@@ -47,7 +48,7 @@ st.session_state.chat_history_jarvis.append(
 )
 model = st.selectbox(
     label=":blue[Select model]",
-    options=["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", "gpt-4-turbo"],
+    options=["gpt-4o", "gpt-4o-mini", "gpt-4o-mini-search-preview", "gpt-4o-search-preview"],
     index = 1,
 )
 

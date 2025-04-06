@@ -44,7 +44,7 @@ if typed_content:
 
 model = st.selectbox(
     label="Select model",
-    options=["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", "gpt-4-turbo"],
+    options=["gpt-4o", "gpt-4o-mini", "gpt-4o-mini-search-preview", "gpt-4o-search-preview"],
     index = 1,
 )
 
