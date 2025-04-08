@@ -19,10 +19,12 @@ import os
 import base64
 from PIL import Image
 
+from datetime import datetime
+import json
 
 
 
-load_dotenv()
+
 
 
 def get_text_from_documents(uploaded_docs):
@@ -114,12 +116,8 @@ def get_convo_chain(vectorstore, model="gpt-3.5-turbo"):
     """
 
     llm = ChatOpenAI(model=model)
-    """
-    llm = HuggingFaceHub(
-        repo_id="google/flan-t5-xxl",
-        model_kwargs={"temperature": 0.5, "max_length": 512},
-    )
-    """
+    #llm = HuggingFaceHub(repo_id="google/flan-t5-xxl",model_kwargs={"temperature": 0.5, "max_length": 512},)
+    
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
     convo_chain = ConversationalRetrievalChain.from_llm(
         llm=llm, retriever=vectorstore.as_retriever(), memory=memory
@@ -162,3 +160,33 @@ def display_uploaded_image(uploaded_image):
     """
     image_to_display = Image.open(uploaded_image)
     return image_to_display
+
+
+def save_chat_log(chat_history:list[str], name:str = None):
+    """saves the chat log to a 'chat_log' folder 
+
+    file_name is name_timestamp.txt if name is given else chat_timestamp.txt
+    Args:
+        chat_history (list[str]): list of chat history
+        name (str, optional): optional file name. Defaults to None.
+    """
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    chat_log_dir = os.path.join(base_dir, 'chat_log')
+    os.makedirs(chat_log_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    file_name = f"{name}_{timestamp}.txt" if name else f"chat_{timestamp}.txt"
+
+    full_path = os.path.join(chat_log_dir, file_name)
+
+    with open(full_path, 'w', encoding='utf-8') as f:
+        prompt = chat_history[0]['content']
+        question= chat_history[1]['content']
+        response= chat_history[2]['content']
+
+        f.write(f"prompt: {prompt}\n")
+        f.write(f"question: {question}\n")
+        f.write(f"response: {response}\n")
+        #json.dump(chat_history, f, indent=4, ensure_ascii=False)
+    print(f"Chat log saved to: {full_path}")

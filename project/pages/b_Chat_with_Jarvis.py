@@ -3,6 +3,7 @@ import openai
 from dotenv import load_dotenv
 import streamlit as st
 from openai import OpenAI
+import app_utils.llm_utils as llm_utils
 
 load_dotenv()
 
@@ -16,6 +17,13 @@ st.header(":robot_face: Chat with JARVIS")
 
 if "chat_history_jarvis" not in st.session_state:
         st.session_state.chat_history_jarvis = []
+
+@st.fragment
+def save_chat():
+    submitted = st.checkbox('save_chat')
+    if submitted:
+        llm_utils.save_chat_log(st.session_state.chat_history_jarvis[-3:])
+        st.write('chat saved successfully')
 
 
 pre_defined_content = [
@@ -69,6 +77,7 @@ if question:
     print(f"JARVIS: {reply}")
     st.session_state.chat_history_jarvis.append({"role": "assistant", "content": reply})
     
-
+    save_chat()
+    
 
 
