@@ -28,13 +28,15 @@ def save_chat():
 
 pre_defined_content = [
     "You are an Intelligent assistant who is good at explaining things in a simple way",
+    "Explain in simple words as if explaining it to a child",
     "You are an expert in programming",
-    "You are the most intelligent assistant who can solve anything",
     "Answer in minimum words as possible",
     "Answer in minimum words as possible with reasoning",
-    "You are a Scientific research student. Rephrase this sentence to avoid plagiarism",
     "Check the grammar and rephrase if required. You are also allowed to improvise",
-    "You are a helpful assistant"
+    "You are a helpful assistant",
+    "I will give word(s). Just return suitable emojis and nothing else.",
+    "Explain in simple words in Hinglish. Maintain a friendly tone. keep the text in english",
+    "Explain in simple words in Kannada-English. Maintain a friendly tone. keep the text in english",
 ]
 
 my_content = st.selectbox(
@@ -56,12 +58,12 @@ st.session_state.chat_history_jarvis.append(
 )
 model = st.selectbox(
     label=":blue[Select model]",
-    options=["gpt-4o", "gpt-4o-mini", "gpt-4o-mini-search-preview", "gpt-4o-search-preview"],
-    index = 1,
+    options=["gpt-5-2025-08-07","gpt-5-mini-2025-08-07", "gpt-4.1-mini-2025-04-14","gpt-4o", "gpt-4o-mini", "gpt-4.1-2025-04-14", "chatgpt-4o-latest", "gpt-4o-mini-2024-07-18", "gpt-4o-mini-search-preview", "gpt-4o-search-preview"],
+    index = 2,
 )
 
 
-question = st.text_area(":red[Type your question]")
+question = st.text_area(":red[Type your question]", height=300)
 message = f"User : {question}"
 
 if question:
