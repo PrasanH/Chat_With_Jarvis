@@ -66,7 +66,7 @@ def main():
         # we can also use it outside loops
 
 
-    user_question = st.text_input(":blue[Type your question]")
+    user_question = st.text_area(":blue[Type your question]")
 
     if user_question:
         llm_utils.handle_user_input(user_question, st.session_state.conversation)

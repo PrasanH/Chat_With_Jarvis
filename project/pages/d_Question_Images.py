@@ -37,14 +37,14 @@ my_content = st.selectbox(
 )
 
 with st.expander(label="Type your content if needed :point_down:", expanded=False):
-    typed_content = st.text_input("type your content")
+    typed_content = st.text_area("type your content")
 
 if typed_content:
     my_content = typed_content
 
 model = st.selectbox(
     label="Select model",
-    options=["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", "gpt-4-turbo"],
+    options=["gpt-4o", "gpt-4o-mini", "gpt-4o-mini-search-preview", "gpt-4o-search-preview"],
     index = 1,
 )
 

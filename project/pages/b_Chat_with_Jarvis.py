@@ -3,6 +3,7 @@ import openai
 from dotenv import load_dotenv
 import streamlit as st
 from openai import OpenAI
+import app_utils.llm_utils as llm_utils
 
 load_dotenv()
 
@@ -17,6 +18,13 @@ st.header(":robot_face: Chat with JARVIS")
 if "chat_history_jarvis" not in st.session_state:
         st.session_state.chat_history_jarvis = []
 
+@st.fragment
+def save_chat():
+    submitted = st.checkbox('save_chat')
+    if submitted:
+        llm_utils.save_chat_log(st.session_state.chat_history_jarvis[-3:])
+        st.write('chat saved successfully')
+
 
 pre_defined_content = [
     "You are an Intelligent assistant who is good at explaining things in a simple way",
@@ -26,6 +34,7 @@ pre_defined_content = [
     "Answer in minimum words as possible with reasoning",
     "You are a Scientific research student. Rephrase this sentence to avoid plagiarism",
     "Check the grammar and rephrase if required. You are also allowed to improvise",
+    "You are a helpful assistant"
 ]
 
 my_content = st.selectbox(
@@ -47,12 +56,12 @@ st.session_state.chat_history_jarvis.append(
 )
 model = st.selectbox(
     label=":blue[Select model]",
-    options=["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", "gpt-4-turbo"],
+    options=["gpt-4o", "gpt-4o-mini", "gpt-4o-mini-search-preview", "gpt-4o-search-preview"],
     index = 1,
 )
 
 
-question = st.text_input(":red[Type your question]")
+question = st.text_area(":red[Type your question]")
 message = f"User : {question}"
 
 if question:
@@ -68,6 +77,7 @@ if question:
     print(f"JARVIS: {reply}")
     st.session_state.chat_history_jarvis.append({"role": "assistant", "content": reply})
     
-
+    save_chat()
+    
 
 

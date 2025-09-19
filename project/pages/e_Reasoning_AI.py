@@ -14,7 +14,14 @@ st.set_page_config(page_title="JARVIS reasoning(o1-mini)", page_icon= ":robot_fa
 
 st.header(":robot_face: JARVIS Reasoning :bulb: ")
 
-my_content = st.text_input(":red[Type your question]")
+model = st.selectbox(
+    label=":blue[Select model]",
+    options=["o3-mini", "o1-mini"],
+    index = 0,
+)
+
+
+my_content = st.text_area(":red[Type your question]")
 text_to_append = "Answer in brief"
 #o1 models are expensive. to reduce the token size we will prefer the brief answers
 
@@ -27,7 +34,7 @@ if brief_answer:
 
 if my_content != '. ' + text_to_append:
     response = client.chat.completions.create(
-        model="o1-mini",
+        model=model,
         messages=[
             {
                 "role": "user", 
