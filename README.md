@@ -9,9 +9,11 @@
 
 
 # Chat with JARVIS 
-- Available models: gpt-4o, gpt-4omini, gpt-4-turbo
+- Available models: gpt-5, gpt5-mini, gpt4.1, gpt4.1-mini, easy to update new models. 
 - Select among available content or type your own content
-![Alt-Text](Docs/Images/jarvis_comparison.png)
+![Alt-Text](Docs/Images/jarvis_comparison.png)  
+
+![Alt-Text](Docs/Images/cwj_hinglish.PNG)
 
 # Chat with JARVIS on Images 
 - Question Images
