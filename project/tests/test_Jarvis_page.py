@@ -22,7 +22,7 @@ def test_chat_function():
         #select a value from the first dropdown(selectbox)
         at.selectbox[0].set_value("You are an expert in programming").run()
         
-        assert at.selectbox[0].options[1] == "You are an expert in programming"
+        assert at.selectbox[0].options[2] == "You are an expert in programming"
 
         #input 'hi' in the question area
         at.text_input[0].input('hi').run()
