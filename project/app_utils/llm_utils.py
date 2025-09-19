@@ -29,16 +29,20 @@ import json
 
 def get_text_from_documents(uploaded_docs):
     """
-    Functions returns text chunks for the uploaded files (.pdf or .docx)
+    Functions extracts and concatenates text from uploaded document files (.pdf or .docx)
+    
+    Dependency:  function call to extract_text_from_docx(), if .docx
 
     Args:
-        uploaded_docs (_type_): _description_
+        uploaded_docs (List[UploadedFile]): List of uploaded files from Streamlit.
 
     Returns:
-        _type_: text chunks (RAW text chunks)
+        str: Concatenated raw text extracted from all uploaded documents.
     """
     st.write(uploaded_docs)
-    text = ""
+
+    text = ""  # empty string to hold all extracted text
+
     for uploaded_doc in uploaded_docs:
 
         if ".pdf" in uploaded_doc.name:
@@ -52,28 +56,44 @@ def get_text_from_documents(uploaded_docs):
 
 
 def extract_text_from_docx(docx_file):
+    """
+    Extracts all text from a .docx file and return it as a single string.
+
+    Args:
+        docx_file (str): 
+
+    Returns:
+        text (str): All text combined from the document (.docx), separated by new lines.
+    """
     text = ""
     doc = Document(docx_file)
+
     for paragraph in doc.paragraphs:
         text += paragraph.text + "\n"
+
     return text
 
 
 def get_text_chunks(raw_text):
     """
-    function returns list of text chunks from raw text
+    Splits raw text into smaller chunks for easier processing.
+
+    This function uses a character-based splitter that breaks text into chunks 
+    of a specified size, with some overlap to maintain context.
+    
     Here, we can specify the chunk size, overlap and the length function
+
     Args:
-        raw_text (_type_): _description_
+        raw_text (str): The full text string to be split into chunks.
 
     Returns:
         _type_: list of text chunks
     """
     text_splitter = CharacterTextSplitter(
-        separator="\n",
-        chunk_size=1000,  # char size
-        chunk_overlap=150,  # to keep a bit of history so that to make sense, 200
-        length_function=len,  # len function of python
+        separator="\n",   #splits text at newline characters
+        chunk_size=1000,  # max number of characters per chunk
+        chunk_overlap=150,  # number of chars overlapped between chunks to preserve context
+        length_function=len,  # len function of python to measure chunk length
     )
     chunks = text_splitter.split_text(raw_text)
 
@@ -105,40 +125,59 @@ def get_vectorstore(text_chunks:list):
 
 def get_convo_chain(vectorstore, model="gpt-3.5-turbo"):
     """
-    Function returns conversation chain
+    Creates and returns a conversational retrieval chain using a specified LLM.
 
     Args:
-        vectorstore: 
-        model: default model is "gpt-3.5-turbo", if nothing is passed
+        vectorstore: A vector store instance that supports retrieval with `as_retriever()` method.
+        model (str): LLM model to use.  default is "gpt-3.5-turbo". 
 
     Returns:
-        _type_: 
+        ConversationalRetrievalChain: An instance that handles conversational retrieval with memory.
     """
 
     llm = ChatOpenAI(model=model)
-    #llm = HuggingFaceHub(repo_id="google/flan-t5-xxl",model_kwargs={"temperature": 0.5, "max_length": 512},)
     
+    # Create a conversation memory buffer to keep track of chat history
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+    # Build the conversational retrieval chain using the language model, vectorstore retriever, and memory
     convo_chain = ConversationalRetrievalChain.from_llm(
         llm=llm, retriever=vectorstore.as_retriever(), memory=memory
     )
     return convo_chain
 
 
+
 def handle_user_input(user_question, conversation):
-    # response = st.session_state.conversation({"question": user_question})
+    """
+    Handles the user's question by passing it to the conversation chain,
+    updates the chat history in the session state, and displays the 
+    conversation as alternating questions and responses.
+
+    Args:
+        user_question (str): The question input by the user.
+        conversation (callable): The conversation chain/function to generate responses.
+    """
+    # Send the user's question to the conversation chain and get the response
     response = conversation({"question": user_question})
+
+    # Update the session state with the updated chat history from the response
     st.session_state.chat_history = response["chat_history"]
 
+    # Iterate over the chat messages and display them alternately as Question and Response
     for i, message in enumerate(st.session_state.chat_history):
         if i % 2 == 0:
+            # Even index - user question
             st.write("**Question:**", message.content)
         else:
+            # Odd index - response from LLM
             st.write("**Response:**", message.content)
 
 
 def encode_image(uploaded_image):
-    """Encodes an uploaded image to base64
+    """
+    Encodes an uploaded image to base64 string. 
+    Requires base64 module 
 
     Args:
         uploaded_image (UploadedFile): The uploaded image file from Streamlit.
@@ -147,7 +186,9 @@ def encode_image(uploaded_image):
         str: Base64 encoded string of the image
     """
     image_bytes = uploaded_image.read()
-    return base64.b64encode(image_bytes).decode('utf-8')
+    base64_str = base64.b64encode(image_bytes).decode('utf-8')
+
+    return base64_str
     
 
 
@@ -163,11 +204,14 @@ def display_uploaded_image(uploaded_image):
 
 
 def save_chat_log(chat_history:list[str], name:str = None):
-    """saves the chat log to a 'chat_log' folder 
+    """
+    saves the chat log to a 'chat_log' folder 
 
-    file_name is name_timestamp.txt if name is given else chat_timestamp.txt
+    The filename format is `{name}_{timestamp}.txt` if a name is provided,
+    otherwise `chat_{timestamp}.txt`.
+
     Args:
-        chat_history (list[str]): list of chat history
+        chat_history (list[dict]): List of chat messages, each message is expected to be a dictionary containing a 'content' key.
         name (str, optional): optional file name. Defaults to None.
     """
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -190,3 +234,6 @@ def save_chat_log(chat_history:list[str], name:str = None):
         f.write(f"response: {response}\n")
         #json.dump(chat_history, f, indent=4, ensure_ascii=False)
     print(f"Chat log saved to: {full_path}")
+
+
+
