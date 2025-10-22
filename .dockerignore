@@ -3,3 +3,18 @@ project/.env
 __pycache__/
 *.pyc 
 *.pyo
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Documentation
+*.md
+docs/
+README*
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore

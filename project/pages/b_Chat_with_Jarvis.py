@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import streamlit as st
 from openai import OpenAI
 import app_utils.llm_utils as llm_utils
+from app_utils import content
 
 load_dotenv()
 
@@ -26,23 +27,11 @@ def save_chat():
         st.write('chat saved successfully')
 
 
-pre_defined_content = [
-    "You are an Intelligent assistant who is good at explaining things in a simple way",
-    "Explain in simple words as if explaining it to a child",
-    "You are an expert in programming",
-    "Answer in minimum words as possible",
-    "Answer in minimum words as possible with reasoning",
-    "Check the grammar and rephrase if required. You are also allowed to improvise",
-    "You are a helpful assistant",
-    "I will give word(s). Just return suitable emojis and nothing else.",
-    "Explain in simple words in Hinglish. Maintain a friendly tone. keep the text in english",
-    "Explain in simple words in Kannada-English. Maintain a friendly tone. keep the text in english",
-]
-
 my_content = st.selectbox(
     label=" :red[Content]",
-    options=pre_defined_content,
+    options=content.pre_defined_content,
 )
+
 with st.expander(label="Type your content if needed :point_down:", expanded=False):
     typed_content = st.text_input("type your content")
 
