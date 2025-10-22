@@ -52,14 +52,19 @@ model = st.selectbox(
 )
 
 
-question = st.text_area(":red[Type your question]", height=300)
+question = st.text_area(":red[Type your question]", height=200)
 message = f"User : {question}"
 
 if question:
     st.session_state.chat_history_jarvis.append(
         {"role": "user", "content": message},
     )
-    chat = client.chat.completions.create(model=model, messages=st.session_state.chat_history_jarvis)
+
+    with st.spinner("Thinking..."):
+            chat = client.chat.completions.create(
+                model=model, 
+                messages=st.session_state.chat_history_jarvis
+            )
 
     reply = chat.choices[0].message.content
 
