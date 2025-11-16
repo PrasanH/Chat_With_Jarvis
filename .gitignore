@@ -5,3 +5,6 @@ project/app_utils/__pycache__/
 Jarvis.bat
 *__pycache__/
 project/chat_log/
+chroma_db/
+.vscode/
+project/app_utils/cover_letter.py

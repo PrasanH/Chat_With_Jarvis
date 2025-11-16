@@ -1,3 +1,5 @@
+from pathlib import Path
+from typing import List
 import streamlit as st
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
@@ -11,8 +13,8 @@ from langchain.chains import ConversationalRetrievalChain  ### to chat with our 
 from langchain_community.chat_models import ChatOpenAI
 
 from langchain_community.llms import HuggingFaceHub
-
 # from InstructorEmbedding import INSTRUCTOR
+from langchain_community.vectorstores import Chroma
 from docx import Document
 import os
 
@@ -105,24 +107,42 @@ def get_text_chunks(raw_text):
 
 
 
-def get_vectorstore(text_chunks:list):
+def get_vectorstore(text_chunks: List[str], vector_db: str = "chromadb"):
     """
-    Function returns vectorstore from FAISS from list of text chunks
+    Function returns vectorstore from text chunks using specified embedding model.
 
-    For embedding, we use OpenAI embediing model( default)
+    For embedding, we use OpenAI embedding model( default)
     
-    Then, we use FAISS to create a vector store using the embedding model. ie. vector store where our text chunks are represented as numbers.
+    vector store/db where our text chunks are represented as numbers.
 
     Args:
-        text_chunks (list): _description_
+        text_chunks (List[str]): List of text chunks to embed.
+        vector_db (str): Type of vector store - "faiss" or "chromadb" (default).
+        collection_name (str): Name for the Chroma collection.
 
     Returns:
-        _type_: _description_
+        Union[FAISS, Chroma]: Vector store instance.
     """
     embeddings = OpenAIEmbeddings()
-    # embeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
-    vectorstore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
+    
+    if vector_db == "faiss":
+        vectorstore = FAISS.from_texts(
+            texts=text_chunks, embedding=embeddings)
 
+    elif vector_db == "chromadb":
+        # Create persist directory if it doesn't exist
+        persist_dir = Path("./chroma_db")
+        persist_dir.mkdir(exist_ok=True)
+        
+        vectorstore = Chroma.from_texts(
+            texts=text_chunks,
+            embedding=embeddings,
+            persist_directory=str(persist_dir),
+            #collection_name=collection_name
+        )
+    else:
+        raise ValueError(f"Unsupported vector_db type: {vector_db}. "
+                        f"Choose 'faiss' or 'chromadb'")
     return vectorstore
 
 
