@@ -33,23 +33,25 @@ def main():
 
     if st.button("Process"):
 
-        # Get raw text from uploaded docs ( .pdf or .docx) 
+        with st.spinner("Chunking the documents and setting up VectorStore..."):
 
-        raw_text = llm_utils.get_text_from_documents(uploaded_docs)
-        # st.write(raw_text)   # debugging
+            # Get raw text from uploaded docs ( .pdf or .docx) 
 
-        # Split the extracted raw text into smaller text chunks
+            raw_text = llm_utils.get_text_from_documents(uploaded_docs)
+            # st.write(raw_text)   # debugging
 
-        text_chunks = llm_utils.get_text_chunks(raw_text)
-        #st.write(text_chunks)    # debugging
+            # Split the extracted raw text into smaller text chunks
 
-        # Create a vector store (embedding vector database) from the text chunks
-        vectorstore = llm_utils.get_vectorstore(text_chunks)
-        
+            text_chunks = llm_utils.get_text_chunks(raw_text)
+            #st.write(text_chunks)    # debugging
 
-        # Initialize the conversational retrieval chain with the vector store and model
+            # Create a vector store (embedding vector database) from the text chunks
+            vectorstore = llm_utils.get_vectorstore(text_chunks)
+            
 
-        st.session_state.conversation = llm_utils.get_convo_chain(vectorstore, model)
+            # Initialize the conversational retrieval chain with the vector store and model
+
+            st.session_state.conversation = llm_utils.get_convo_chain(vectorstore, model)
 
 
     user_question = st.text_area(":blue[Type your question]")
