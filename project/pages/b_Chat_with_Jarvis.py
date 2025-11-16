@@ -32,11 +32,11 @@ my_content = st.selectbox(
     options=content.pre_defined_content,
 )
 
-with st.expander(label="Type your content if needed :point_down:", expanded=False):
-    typed_content = st.text_input("type your content")
+with st.expander(label="Type System prompt if needed :point_down:", expanded=False):
+    system_prompt = st.text_input("type your system prompt here")
 
-if typed_content:
-    my_content = typed_content
+if system_prompt:
+    my_content = system_prompt
 
 
 st.session_state.chat_history_jarvis.append(
