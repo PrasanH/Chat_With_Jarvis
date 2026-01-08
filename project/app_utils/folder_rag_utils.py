@@ -184,3 +184,13 @@ def clear_collection(collection_name: str = "pdf_collection"):
         client.delete_collection(name=collection_name)
     except Exception as e:
         print(f"Error clearing collection: {e}")
+
+
+def list_collections():
+    """List all existing ChromaDB collections"""
+    try:
+        client = chromadb.PersistentClient(path="./chroma_db")
+        collections = client.list_collections()
+        return [col.name for col in collections]
+    except Exception as e:
+        return []

@@ -13,27 +13,52 @@ def main():
     st.write("This page allows you to query all PDFs in a specified folder using a persistent ChromaDB vector store.")
 
 
-  
-    # Folder selection
-    pdf_folder = st.text_input(
-        "📂 Enter PDF Folder Path",
-        value="./pdf_documents",
-        help="Path to folder containing PDF files"
+# Collection selection/creation
+    st.subheader("Collection Management")
+    
+    # Get list of existing collections
+    existing_collections = folder_rag_utils.list_collections()
+    
+    collection_option = st.radio(
+        "Choose option:",
+        ["Load Existing Collection", "Create New Collection"],
+        horizontal=True
     )
-
-    # Collection name for ChromaDB
-    collection_name = st.text_input(
-        "🗃️ ChromaDB Collection Name",
-        value="pdf_collection",
-        help="Name for the vector database collection"
-    )
+    
+    if collection_option == "Load Existing Collection":
+        if existing_collections:
+            collection_name = st.selectbox(
+                "📂 Select Collection",
+                options=existing_collections,
+                help="Choose from previously created collections"
+            )
+        else:
+            st.warning("⚠️ No existing collections found. Please create a new one.")
+            collection_name = st.text_input(
+                "🗃️ ChromaDB Collection Name",
+                value="pdf_collection",
+                help="Name for the vector database collection"
+            )
+    else:
+        collection_name = st.text_input(
+            "🗃️ ChromaDB Collection Name",
+            value="pdf_collection",
+            help="Name for the vector database collection"
+        )
+    
+        # Folder selection
+        pdf_folder = st.text_input(
+            "📂 Enter PDF Folder Path",
+            value="./pdf_documents",
+            help="Path to folder containing PDF files"
+        )
 
     # Model selection
     model = st.selectbox(
-        label=":blue[Select model]",
-        options=["gpt-4.1-2025-04-14", "gpt-4.1-mini-2025-04-14", "gpt-5-2025-08-07", "gpt-5-mini-2025-08-07"],
-        index=1,
-    )
+            label=":blue[Select model]",
+            options=["gpt-4.1-2025-04-14", "gpt-4.1-mini-2025-04-14", "gpt-5-2025-08-07", "gpt-5-mini-2025-08-07"],
+            index=1,
+        )
 
     col1, col2, col3 = st.columns(3)
 
