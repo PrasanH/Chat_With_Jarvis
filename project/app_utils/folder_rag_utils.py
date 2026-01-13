@@ -69,7 +69,7 @@ def index_pdf_folder(folder_path: str, collection_name: str = "pdf_collection") 
                 })
     
     # Create embeddings and store in ChromaDB
-    embeddings = OpenAIEmbeddings()
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
     
     # Prepare data for ChromaDB
     texts = [doc['content'] for doc in all_documents]
@@ -97,7 +97,7 @@ def query_pdf_collection(
     Query the PDF collection and return answer with sources
     """
     try:
-        embeddings = OpenAIEmbeddings()
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         
         vectorstore = Chroma(
             collection_name=collection_name,
