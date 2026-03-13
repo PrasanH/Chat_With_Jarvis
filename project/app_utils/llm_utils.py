@@ -4,15 +4,21 @@ import streamlit as st
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
-from langchain_community.embeddings import OpenAIEmbeddings, HuggingFaceInstructEmbeddings
+from langchain_community.embeddings import (
+    OpenAIEmbeddings,
+    HuggingFaceInstructEmbeddings,
+)
+
 # OpenAIEmbeddings,
 from langchain_community.vectorstores import FAISS
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain  ### to chat with our text
-#from langchain.chat_models import ChatOpenAI
+
+# from langchain.chat_models import ChatOpenAI
 from langchain_community.chat_models import ChatOpenAI
 
 from langchain_community.llms import HuggingFaceHub
+
 # from InstructorEmbedding import INSTRUCTOR
 from langchain_community.vectorstores import Chroma
 from docx import Document
@@ -25,14 +31,10 @@ from datetime import datetime
 import json
 
 
-
-
-
-
 def get_text_from_documents(uploaded_docs):
     """
     Functions extracts and concatenates text from uploaded document files (.pdf or .docx)
-    
+
     Dependency:  function call to extract_text_from_docx(), if .docx
 
     Args:
@@ -59,13 +61,12 @@ def get_text_from_documents(uploaded_docs):
     return text
 
 
-
 def extract_text_from_docx(docx_file):
     """
     Extracts all text from a .docx file and return it as a single string.
 
     Args:
-        docx_file (str): 
+        docx_file (str):
 
     Returns:
         text (str): All text combined from the document (.docx), separated by new lines.
@@ -79,14 +80,13 @@ def extract_text_from_docx(docx_file):
     return text
 
 
-
 def get_text_chunks(raw_text):
     """
     Splits raw text into smaller chunks for easier processing.
 
-    This function uses a character-based splitter that breaks text into chunks 
+    This function uses a character-based splitter that breaks text into chunks
     of a specified size, with some overlap to maintain context.
-    
+
     Here, we can specify the chunk size, overlap and the length function
 
     Args:
@@ -96,7 +96,7 @@ def get_text_chunks(raw_text):
         _type_: list of text chunks
     """
     text_splitter = CharacterTextSplitter(
-        separator="\n",   #splits text at newline characters
+        separator="\n",  # splits text at newline characters
         chunk_size=1000,  # max number of characters per chunk
         chunk_overlap=150,  # number of chars overlapped between chunks to preserve context
         length_function=len,  # len function of python to measure chunk length
@@ -106,13 +106,12 @@ def get_text_chunks(raw_text):
     return chunks
 
 
-
 def get_vectorstore(text_chunks: List[str], vector_db: str = "chromadb"):
     """
     Function returns vectorstore from text chunks using specified embedding model.
 
     For embedding, we use OpenAI embedding model( default)
-    
+
     vector store/db where our text chunks are represented as numbers.
 
     Args:
@@ -124,27 +123,26 @@ def get_vectorstore(text_chunks: List[str], vector_db: str = "chromadb"):
         Union[FAISS, Chroma]: Vector store instance.
     """
     embeddings = OpenAIEmbeddings()
-    
+
     if vector_db == "faiss":
-        vectorstore = FAISS.from_texts(
-            texts=text_chunks, embedding=embeddings)
+        vectorstore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
 
     elif vector_db == "chromadb":
         # Create persist directory if it doesn't exist
         persist_dir = Path("./chroma_db")
         persist_dir.mkdir(exist_ok=True)
-        
+
         vectorstore = Chroma.from_texts(
             texts=text_chunks,
             embedding=embeddings,
             persist_directory=str(persist_dir),
-            #collection_name=collection_name
+            # collection_name=collection_name
         )
     else:
-        raise ValueError(f"Unsupported vector_db type: {vector_db}. "
-                        f"Choose 'faiss' or 'chromadb'")
+        raise ValueError(
+            f"Unsupported vector_db type: {vector_db}. " f"Choose 'faiss' or 'chromadb'"
+        )
     return vectorstore
-
 
 
 def get_convo_chain(vectorstore, model="gpt-3.5-turbo"):
@@ -153,14 +151,14 @@ def get_convo_chain(vectorstore, model="gpt-3.5-turbo"):
 
     Args:
         vectorstore: A vector store instance that supports retrieval with `as_retriever()` method.
-        model (str): LLM model to use.  default is "gpt-3.5-turbo". 
+        model (str): LLM model to use.  default is "gpt-3.5-turbo".
 
     Returns:
         ConversationalRetrievalChain: An instance that handles conversational retrieval with memory.
     """
 
     llm = ChatOpenAI(model=model)
-    
+
     # Create a conversation memory buffer to keep track of chat history
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
@@ -171,11 +169,10 @@ def get_convo_chain(vectorstore, model="gpt-3.5-turbo"):
     return convo_chain
 
 
-
 def handle_user_input(user_question, conversation):
     """
     Handles the user's question by passing it to the conversation chain,
-    updates the chat history in the session state, and displays the 
+    updates the chat history in the session state, and displays the
     conversation as alternating questions and responses.
 
     Args:
@@ -200,8 +197,8 @@ def handle_user_input(user_question, conversation):
 
 def encode_image(uploaded_image):
     """
-    Encodes an uploaded image to base64 string. 
-    Requires base64 module 
+    Encodes an uploaded image to base64 string.
+    Requires base64 module
 
     Args:
         uploaded_image (UploadedFile): The uploaded image file from Streamlit.
@@ -210,10 +207,9 @@ def encode_image(uploaded_image):
         str: Base64 encoded string of the image
     """
     image_bytes = uploaded_image.read()
-    base64_str = base64.b64encode(image_bytes).decode('utf-8')
+    base64_str = base64.b64encode(image_bytes).decode("utf-8")
 
     return base64_str
-    
 
 
 def display_uploaded_image(uploaded_image):
@@ -227,9 +223,9 @@ def display_uploaded_image(uploaded_image):
     return image_to_display
 
 
-def save_chat_log(chat_history:list[str], name:str = None):
+def save_chat_log(chat_history: list[str], name: str = None):
     """
-    saves the chat log to a 'chat_log' folder 
+    saves the chat log to a 'chat_log' folder
 
     The filename format is `{name}_{timestamp}.txt` if a name is provided,
     otherwise `chat_{timestamp}.txt`.
@@ -239,7 +235,7 @@ def save_chat_log(chat_history:list[str], name:str = None):
         name (str, optional): optional file name. Defaults to None.
     """
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    chat_log_dir = os.path.join(base_dir, 'chat_log')
+    chat_log_dir = os.path.join(base_dir, "chat_log")
     os.makedirs(chat_log_dir, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -248,16 +244,81 @@ def save_chat_log(chat_history:list[str], name:str = None):
 
     full_path = os.path.join(chat_log_dir, file_name)
 
-    with open(full_path, 'w', encoding='utf-8') as f:
-        prompt = chat_history[0]['content']
-        question= chat_history[1]['content']
-        response= chat_history[2]['content']
+    with open(full_path, "w", encoding="utf-8") as f:
+        prompt = chat_history[0]["content"]
+        question = chat_history[1]["content"]
+        response = chat_history[2]["content"]
 
         f.write(f"prompt: {prompt}\n")
         f.write(f"question: {question}\n")
         f.write(f"response: {response}\n")
-        #json.dump(chat_history, f, indent=4, ensure_ascii=False)
+        # json.dump(chat_history, f, indent=4, ensure_ascii=False)
     print(f"Chat log saved to: {full_path}")
 
 
+# --- Chat session persistence (JSON-based) ---
 
+
+def _get_chat_log_dir() -> str:
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    chat_log_dir = os.path.join(base_dir, "chat_log")
+    os.makedirs(chat_log_dir, exist_ok=True)
+    return chat_log_dir
+
+
+def save_chat_session(session_id: str, title: str, messages: list, created: str = None):
+    """Save a full chat session as a JSON file in the chat_log directory."""
+    chat_log_dir = _get_chat_log_dir()
+    file_path = os.path.join(chat_log_dir, f"{session_id}.json")
+    session_data = {
+        "id": session_id,
+        "title": title,
+        "created": created or datetime.now().isoformat(),
+        "updated": datetime.now().isoformat(),
+        "messages": messages,
+    }
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(session_data, f, indent=2, ensure_ascii=False)
+
+
+def load_chat_session(session_id: str) -> dict:
+    """Load a chat session by ID. Returns None if not found."""
+    chat_log_dir = _get_chat_log_dir()
+    file_path = os.path.join(chat_log_dir, f"{session_id}.json")
+    if not os.path.exists(file_path):
+        return None
+    with open(file_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def list_chat_sessions() -> list:
+    """Return all saved chat sessions sorted by most recently updated first."""
+    chat_log_dir = _get_chat_log_dir()
+    sessions = []
+    for file_name in os.listdir(chat_log_dir):
+        if not file_name.endswith(".json"):
+            continue
+        file_path = os.path.join(chat_log_dir, file_name)
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            sessions.append(
+                {
+                    "id": data["id"],
+                    "title": data.get("title", "Untitled"),
+                    "created": data.get("created", ""),
+                    "updated": data.get("updated", ""),
+                }
+            )
+        except Exception:
+            pass
+    sessions.sort(key=lambda x: x.get("updated", ""), reverse=True)
+    return sessions
+
+
+def delete_chat_session(session_id: str):
+    """Delete a chat session JSON file by ID."""
+    chat_log_dir = _get_chat_log_dir()
+    file_path = os.path.join(chat_log_dir, f"{session_id}.json")
+    if os.path.exists(file_path):
+        os.remove(file_path)
