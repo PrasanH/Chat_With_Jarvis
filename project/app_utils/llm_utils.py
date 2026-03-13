@@ -325,3 +325,16 @@ def delete_chat_session(session_id: str):
     file_path = os.path.join(chat_log_dir, f"{session_id}.json")
     if os.path.exists(file_path):
         os.remove(file_path)
+
+
+def rename_chat_session(session_id: str, new_title: str):
+    """Update only the title field of an existing chat session JSON."""
+    data = load_chat_session(session_id)
+    if data is None:
+        return
+    data["title"] = new_title
+    data["updated"] = datetime.now().isoformat()
+    chat_log_dir = _get_chat_log_dir()
+    file_path = os.path.join(chat_log_dir, f"{session_id}.json")
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)

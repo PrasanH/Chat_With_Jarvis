@@ -28,6 +28,8 @@ if "session_docs" not in st.session_state:
     st.session_state.session_docs = []  # filenames of indexed PDFs
 if "session_has_docs" not in st.session_state:
     st.session_state.session_has_docs = False
+if "renaming_session_id" not in st.session_state:
+    st.session_state.renaming_session_id = None  # ID of session being renamed
 
 
 # --- Helpers ---
@@ -73,18 +75,58 @@ with st.sidebar:
         with st.container(height=220, border=False):
             for session in sessions:
                 is_active = st.session_state.session_id == session["id"]
-                col1, col2 = st.columns([5, 1])
-                with col1:
-                    label = f"**{session['title']}**" if is_active else session["title"]
-                    if st.button(
-                        label, key=f"sel_{session['id']}", use_container_width=True
-                    ):
-                        load_session(session["id"])
-                        st.rerun()
-                with col2:
-                    if st.button(":wastebasket:", key=f"del_{session['id']}"):
-                        delete_session(session["id"])
-                        st.rerun()
+                is_renaming = st.session_state.renaming_session_id == session["id"]
+
+                if is_renaming:
+                    new_title = st.text_input(
+                        "Rename",
+                        value=session["title"],
+                        key=f"rename_input_{session['id']}",
+                        label_visibility="collapsed",
+                    )
+                    rc1, rc2 = st.columns([1, 1])
+                    with rc1:
+                        if st.button(
+                            "Save",
+                            key=f"rename_save_{session['id']}",
+                            use_container_width=True,
+                        ):
+                            llm_utils.rename_chat_session(
+                                session["id"], new_title.strip() or session["title"]
+                            )
+                            if st.session_state.session_id == session["id"]:
+                                st.session_state.session_title = (
+                                    new_title.strip() or session["title"]
+                                )
+                            st.session_state.renaming_session_id = None
+                            st.rerun()
+                    with rc2:
+                        if st.button(
+                            "Cancel",
+                            key=f"rename_cancel_{session['id']}",
+                            use_container_width=True,
+                        ):
+                            st.session_state.renaming_session_id = None
+                            st.rerun()
+                else:
+                    col1, col2, col3 = st.columns([5, 1, 1])
+                    with col1:
+                        label = (
+                            f"**{session['title']}**" if is_active else session["title"]
+                        )
+                        if st.button(
+                            label, key=f"sel_{session['id']}", use_container_width=True
+                        ):
+                            load_session(session["id"])
+                            st.rerun()
+                    with col2:
+                        if st.button(":pencil2:", key=f"ren_{session['id']}"):
+                            st.session_state.renaming_session_id = session["id"]
+                            st.rerun()
+                    with col3:
+                        if st.button(":wastebasket:", key=f"del_{session['id']}"):
+                            delete_session(session["id"])
+                            st.rerun()
     else:
         st.caption("No saved chats yet.")
 
