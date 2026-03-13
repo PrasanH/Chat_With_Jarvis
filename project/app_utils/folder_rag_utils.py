@@ -22,18 +22,20 @@ def extract_pdf_with_metadata(pdf_path: str) -> List[Dict]:
     """Extract text from PDF with page numbers and source file metadata"""
     loader = PyPDFLoader(pdf_path)
     pages = loader.load()
-    
+
     documents = []
     for page in pages:
-        documents.append({
-            'content': page.page_content,
-            'metadata': {
-                'source': os.path.basename(pdf_path),
-                'page': page.metadata.get('page', 0) + 1,  # 1-indexed pages
-                'full_path': pdf_path
+        documents.append(
+            {
+                "content": page.page_content,
+                "metadata": {
+                    "source": os.path.basename(pdf_path),
+                    "page": page.metadata.get("page", 0) + 1,  # 1-indexed pages
+                    "full_path": pdf_path,
+                },
             }
-        })
-    
+        )
+
     return documents
 
 
@@ -43,68 +45,63 @@ def index_pdf_folder(folder_path: str, collection_name: str = "pdf_collection") 
     Returns: number of documents indexed
     """
     pdf_files = list(Path(folder_path).glob("*.pdf"))
-    
+
     if not pdf_files:
         return 0
-    
+
     all_documents = []
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
-        length_function=len
+        chunk_size=1000, chunk_overlap=200, length_function=len
     )
-    
+
     # Extract and process all PDFs
     for pdf_file in pdf_files:
         docs = extract_pdf_with_metadata(str(pdf_file))
-        
+
         for doc in docs:
             # Split text into chunks while preserving metadata
-            chunks = text_splitter.split_text(doc['content'])
-            
+            chunks = text_splitter.split_text(doc["content"])
+
             for chunk in chunks:
-                all_documents.append({
-                    'content': chunk,
-                    'metadata': doc['metadata']
-                })
-    
+                all_documents.append({"content": chunk, "metadata": doc["metadata"]})
+
     # Create embeddings and store in ChromaDB
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-    
+
     # Prepare data for ChromaDB
-    texts = [doc['content'] for doc in all_documents]
-    metadatas = [doc['metadata'] for doc in all_documents]
-    
+    texts = [doc["content"] for doc in all_documents]
+    metadatas = [doc["metadata"] for doc in all_documents]
+
     # Create or update ChromaDB collection
     vectorstore = Chroma.from_texts(
         texts=texts,
         embedding=embeddings,
         metadatas=metadatas,
         collection_name=collection_name,
-        persist_directory="./chroma_db"
+        persist_directory="./chroma_db",
     )
-    
+
     return len(all_documents)
 
 
 def query_pdf_collection(
-    question: str, 
+    question: str,
     collection_name: str = "pdf_collection",
     model: str = "gpt-4.1-mini-2025-04-14",
-    k: int = 4
+    k: int = 4,
 ) -> Optional[Dict]:
     """
     Query the PDF collection and return answer with sources
     """
     try:
         embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-        
+
         vectorstore = Chroma(
             collection_name=collection_name,
             embedding_function=embeddings,
-            persist_directory="./chroma_db"
+            persist_directory="./chroma_db",
         )
-        
+
         # Custom prompt to include source citations
         prompt_template = """Use the following pieces of context to answer the question at the end. 
         If you don't know the answer, just say that you don't know, don't try to make up an answer.
@@ -117,39 +114,41 @@ def query_pdf_collection(
         Question: {question}
         
         Answer with source citations:"""
-        
+
         PROMPT = PromptTemplate(
-            template=prompt_template, 
-            input_variables=["context", "question"]
+            template=prompt_template, input_variables=["context", "question"]
         )
-        
+
         llm = ChatOpenAI(model_name=model, temperature=0)
-        
+
         qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
             retriever=vectorstore.as_retriever(search_kwargs={"k": k}),
             return_source_documents=True,
-            chain_type_kwargs={"prompt": PROMPT}
+            chain_type_kwargs={"prompt": PROMPT},
         )
-        
+
         result = qa_chain({"query": question})
-        
+
         # Format sources
         sources = []
-        for doc in result['source_documents']:
-            sources.append({
-                'file': doc.metadata.get('source', 'Unknown'),
-                'page': doc.metadata.get('page', 'N/A'),
-                'content': doc.page_content[:300] + "..." if len(doc.page_content) > 300 else doc.page_content,
-                'score': 1.0  # ChromaDB similarity score (you can add this with similarity_search_with_score)
-            })
-        
-        return {
-            'answer': result['result'],
-            'sources': sources
-        }
-        
+        for doc in result["source_documents"]:
+            sources.append(
+                {
+                    "file": doc.metadata.get("source", "Unknown"),
+                    "page": doc.metadata.get("page", "N/A"),
+                    "content": (
+                        doc.page_content[:300] + "..."
+                        if len(doc.page_content) > 300
+                        else doc.page_content
+                    ),
+                    "score": 1.0,  # ChromaDB similarity score (you can add this with similarity_search_with_score)
+                }
+            )
+
+        return {"answer": result["result"], "sources": sources}
+
     except Exception as e:
         print(f"Error querying collection: {e}")
         return None
@@ -160,18 +159,15 @@ def get_collection_stats(collection_name: str = "pdf_collection") -> Optional[Di
     try:
         client = get_chroma_client()
         collection = client.get_collection(name=collection_name)
-        
+
         data = collection.get()
-        
+
         unique_files = set()
-        if data['metadatas']:
-            for metadata in data['metadatas']:
-                unique_files.add(metadata.get('source', 'Unknown'))
-        
-        return {
-            'count': collection.count(),
-            'unique_files': len(unique_files)
-        }
+        if data["metadatas"]:
+            for metadata in data["metadatas"]:
+                unique_files.add(metadata.get("source", "Unknown"))
+
+        return {"count": collection.count(), "unique_files": len(unique_files)}
     except Exception as e:
         print(f"Error getting stats: {e}")
         return None
@@ -194,3 +190,97 @@ def list_collections():
         return [col.name for col in collections]
     except Exception as e:
         return []
+
+
+# --- Per-session RAG helpers ---
+
+
+def _get_chroma_persist_dir() -> str:
+    """Returns the absolute path to the shared chroma_db directory."""
+    workspace_root = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
+    return os.path.join(workspace_root, "chroma_db")
+
+
+def index_uploaded_pdfs(uploaded_files, collection_name: str) -> list:
+    """
+    Index Streamlit UploadedFile objects into a named Chroma collection.
+    Each chat session uses its session_id as collection_name for isolation.
+    Returns list of indexed file names.
+    """
+    import tempfile
+
+    persist_dir = _get_chroma_persist_dir()
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+
+    texts, metadatas, indexed_names = [], [], []
+
+    for uf in uploaded_files:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(uf.read())
+            tmp_path = tmp.name
+        try:
+            loader = PyPDFLoader(tmp_path)
+            pages = loader.load()
+            for page in pages:
+                for chunk in text_splitter.split_text(page.page_content):
+                    texts.append(chunk)
+                    metadatas.append(
+                        {
+                            "source": uf.name,
+                            "page": page.metadata.get("page", 0) + 1,
+                        }
+                    )
+        finally:
+            os.remove(tmp_path)
+        indexed_names.append(uf.name)
+
+    if texts:
+        Chroma.from_texts(
+            texts=texts,
+            embedding=embeddings,
+            metadatas=metadatas,
+            collection_name=collection_name,
+            persist_directory=persist_dir,
+        )
+
+    return indexed_names
+
+
+def retrieve_context(question: str, collection_name: str, k: int = 5) -> list:
+    """
+    Retrieve the top-k most relevant chunks from a named Chroma collection.
+    Returns list of {"content": str, "source": str, "page": int|str} dicts.
+    """
+    persist_dir = _get_chroma_persist_dir()
+    try:
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+        vectorstore = Chroma(
+            collection_name=collection_name,
+            embedding_function=embeddings,
+            persist_directory=persist_dir,
+        )
+        docs = vectorstore.similarity_search(question, k=k)
+        return [
+            {
+                "content": doc.page_content,
+                "source": doc.metadata.get("source", "Unknown"),
+                "page": doc.metadata.get("page", "N/A"),
+            }
+            for doc in docs
+        ]
+    except Exception as e:
+        print(f"RAG retrieval error: {e}")
+        return []
+
+
+def delete_collection(collection_name: str):
+    """Delete a Chroma collection by name. Silent if it doesn't exist."""
+    persist_dir = _get_chroma_persist_dir()
+    try:
+        client = chromadb.PersistentClient(path=persist_dir)
+        client.delete_collection(collection_name)
+    except Exception:
+        pass

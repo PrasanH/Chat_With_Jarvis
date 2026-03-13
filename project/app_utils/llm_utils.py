@@ -266,7 +266,9 @@ def _get_chat_log_dir() -> str:
     return chat_log_dir
 
 
-def save_chat_session(session_id: str, title: str, messages: list, created: str = None):
+def save_chat_session(
+    session_id: str, title: str, messages: list, created: str = None, docs: list = None
+):
     """Save a full chat session as a JSON file in the chat_log directory."""
     chat_log_dir = _get_chat_log_dir()
     file_path = os.path.join(chat_log_dir, f"{session_id}.json")
@@ -276,6 +278,7 @@ def save_chat_session(session_id: str, title: str, messages: list, created: str 
         "created": created or datetime.now().isoformat(),
         "updated": datetime.now().isoformat(),
         "messages": messages,
+        "docs": docs or [],
     }
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(session_data, f, indent=2, ensure_ascii=False)
