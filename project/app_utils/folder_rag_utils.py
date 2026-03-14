@@ -1,4 +1,5 @@
 import os
+import shutil
 from pathlib import Path
 from typing import List, Dict, Optional
 import chromadb
@@ -187,10 +188,16 @@ def get_collection_stats(collection_name: str = "pdf_collection") -> Optional[Di
 
 
 def clear_collection(collection_name: str = "pdf_collection"):
-    """Clear/delete a collection"""
+    """Clear/delete a collection and its folder from disk"""
     try:
         client = get_chroma_client()
+        collection = client.get_collection(name=collection_name)
+        collection_id = str(collection.id)
         client.delete_collection(name=collection_name)
+        # Remove the UUID folder ChromaDB leaves behind on disk
+        folder_path = os.path.join("./chroma_db", collection_id)
+        if os.path.exists(folder_path):
+            shutil.rmtree(folder_path)
     except Exception as e:
         print(f"Error clearing collection: {e}")
 
