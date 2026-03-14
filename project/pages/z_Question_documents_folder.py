@@ -58,7 +58,8 @@ def main():
                 help="Choose the collection you want to delete",
             )
             if st.button("🗑️ Delete Collection", type="primary"):
-                folder_rag_utils.clear_collection(collection_to_delete)
+                with st.spinner("Deleting collection..."):
+                    folder_rag_utils.clear_collection(collection_to_delete)
                 st.warning(f"Collection '{collection_to_delete}' deleted!")
         else:
             st.warning("⚠️ No existing collections found.")
