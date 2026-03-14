@@ -39,24 +39,33 @@ def extract_pdf_with_metadata(pdf_path: str) -> List[Dict]:
     return documents
 
 
-def index_pdf_folder(folder_path: str, collection_name: str = "pdf_collection") -> int:
+def index_pdf_folder(
+    folder_path: str,
+    collection_name: str = "pdf_collection",
+    progress_callback=None,
+) -> Dict:
     """
-    Index all PDFs in a folder into ChromaDB
-    Returns: number of documents indexed
+    Index all PDFs in a folder into ChromaDB.
+    Returns: dict with num_files, num_pages, num_chunks
     """
     pdf_files = list(Path(folder_path).glob("*.pdf"))
 
     if not pdf_files:
-        return 0
+        return {"num_files": 0, "num_pages": 0, "num_chunks": 0}
 
     all_documents = []
+    total_pages = 0
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000, chunk_overlap=200, length_function=len
     )
 
     # Extract and process all PDFs
     for pdf_file in pdf_files:
+        if progress_callback:
+            progress_callback(pdf_file.name)
+
         docs = extract_pdf_with_metadata(str(pdf_file))
+        total_pages += len(docs)
 
         for doc in docs:
             # Split text into chunks while preserving metadata
@@ -73,7 +82,7 @@ def index_pdf_folder(folder_path: str, collection_name: str = "pdf_collection") 
     metadatas = [doc["metadata"] for doc in all_documents]
 
     # Create or update ChromaDB collection
-    vectorstore = Chroma.from_texts(
+    Chroma.from_texts(
         texts=texts,
         embedding=embeddings,
         metadatas=metadatas,
@@ -81,7 +90,11 @@ def index_pdf_folder(folder_path: str, collection_name: str = "pdf_collection") 
         persist_directory="./chroma_db",
     )
 
-    return len(all_documents)
+    return {
+        "num_files": len(pdf_files),
+        "num_pages": total_pages,
+        "num_chunks": len(all_documents),
+    }
 
 
 def query_pdf_collection(
