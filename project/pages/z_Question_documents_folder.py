@@ -95,7 +95,7 @@ def main():
             stats = folder_rag_utils.get_collection_stats(collection_name)
             if stats:
                 st.info(
-                    f"📚 Documents: {stats['count']}\n\n📄 Files: {stats['unique_files']}"
+                    f"📚 Chunks: {stats['count']}\n\n📄 Files: {stats['unique_files']}"
                 )
 
     with col3:
