@@ -105,12 +105,12 @@ def main():
                     st.write(response['answer'])
                     
                     st.divider()
-                    st.subheader("📚 Sources:")
-                    
-                    for i, source in enumerate(response['sources'], 1):
-                        with st.expander(f"Source {i}: {source['file']} (Page {source['page']})"):
+                    with st.expander("📊 Sources"):
+                        for i, source in enumerate(response['sources'], 1):
+                            st.markdown(f"**Source {i}:** `{source['file']}` (Page {source['page']})")
                             st.write(source['content'])
                             st.caption(f"Relevance Score: {source['score']:.3f}")
+                            st.divider()
         else:
             st.warning("Please enter a question.")
 
