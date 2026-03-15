@@ -1,7 +1,10 @@
 import os
+import io
+import base64
 from dotenv import load_dotenv
 import streamlit as st
 from openai import OpenAI
+from PIL import Image
 from datetime import datetime
 import app_utils.llm_utils as llm_utils
 import app_utils.folder_rag_utils as rag
@@ -31,6 +34,12 @@ if "session_has_docs" not in st.session_state:
     st.session_state.session_has_docs = False
 if "renaming_session_id" not in st.session_state:
     st.session_state.renaming_session_id = None  # ID of session being renamed
+if "pending_image" not in st.session_state:
+    st.session_state.pending_image = (
+        None  # base64 str of image to attach to next message
+    )
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = 0  # increment to reset file uploaders
 
 
 # --- Helpers ---
@@ -42,6 +51,8 @@ def start_new_chat():
     st.session_state.session_created = None
     st.session_state.session_docs = []
     st.session_state.session_has_docs = False
+    st.session_state.pending_image = None
+    st.session_state.uploader_key += 1
 
 
 def load_session(session_id: str):
@@ -54,6 +65,8 @@ def load_session(session_id: str):
         st.session_state.session_created = data.get("created")
         st.session_state.session_docs = data.get("docs", [])
         st.session_state.session_has_docs = len(st.session_state.session_docs) > 0
+        st.session_state.pending_image = None
+        st.session_state.uploader_key += 1
 
 
 def delete_session(session_id: str):
@@ -134,56 +147,6 @@ with st.sidebar:
     else:
         st.caption("No saved chats yet.")
 
-    st.divider()
-    st.subheader(":page_facing_up: Documents")
-
-    uploaded_files = st.file_uploader(
-        "Upload PDF(s) to chat context",
-        type="pdf",
-        accept_multiple_files=True,
-        key="doc_uploader",
-    )
-
-    if uploaded_files:
-        # Only process files not already indexed in this session
-        new_files = [
-            f for f in uploaded_files if f.name not in st.session_state.session_docs
-        ]
-
-        if new_files:
-            # Ensure a session exists before we can name the Chroma collection
-            if st.session_state.session_id is None:
-                st.session_state.session_id = (
-                    f"chat_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
-                )
-                st.session_state.session_created = datetime.now().isoformat()
-                st.session_state.session_title = "Doc Chat"
-
-            with st.spinner("Indexing documents..."):
-                new_names = rag.index_uploaded_pdfs(
-                    uploaded_files=new_files,
-                    collection_name=st.session_state.session_id,
-                )
-            for name in new_names:
-                if name not in st.session_state.session_docs:
-                    st.session_state.session_docs.append(name)
-            st.session_state.session_has_docs = True
-
-            llm_utils.save_chat_session(
-                session_id=st.session_state.session_id,
-                title=st.session_state.session_title,
-                messages=st.session_state.messages,
-                created=st.session_state.session_created,
-                docs=st.session_state.session_docs,
-            )
-            st.success(f"Indexed {len(new_names)} file(s)")
-
-    if st.session_state.session_docs:
-        for doc_name in st.session_state.session_docs:
-            st.caption(f":page_facing_up: {doc_name}")
-    else:
-        st.caption("No documents attached.")
-
 
 # --- Main area ---
 st.header(":robot_face: Chat with JARVIS")
@@ -224,14 +187,106 @@ system_prompt = _custom if _custom else content.pre_defined_content[_preset_key]
 # --- Display current conversation ---
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+        if isinstance(msg["content"], list):
+            for part in msg["content"]:
+                if part["type"] == "text":
+                    st.markdown(part["text"])
+                elif part["type"] == "image_url":
+                    b64_data = part["image_url"]["url"].split(",")[1]
+                    st.image(
+                        Image.open(io.BytesIO(base64.b64decode(b64_data))), width=300
+                    )
+        else:
+            st.markdown(msg["content"])
+
+# --- Attachments ---
+with st.expander(":paperclip: Attach files", expanded=False):
+    att_col1, att_col2 = st.columns(2)
+
+    with att_col1:
+        st.caption(":page_facing_up: **Documents (PDF)**")
+        uploaded_files = st.file_uploader(
+            "Upload PDF(s) to chat context",
+            type="pdf",
+            accept_multiple_files=True,
+            key=f"doc_uploader_{st.session_state.uploader_key}",
+            label_visibility="collapsed",
+        )
+        if uploaded_files:
+            new_files = [
+                f for f in uploaded_files if f.name not in st.session_state.session_docs
+            ]
+            if new_files:
+                if st.session_state.session_id is None:
+                    st.session_state.session_id = (
+                        f"chat_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+                    )
+                    st.session_state.session_created = datetime.now().isoformat()
+                    st.session_state.session_title = "Doc Chat"
+                with st.spinner("Indexing documents..."):
+                    new_names = rag.index_uploaded_pdfs(
+                        uploaded_files=new_files,
+                        collection_name=st.session_state.session_id,
+                    )
+                for name in new_names:
+                    if name not in st.session_state.session_docs:
+                        st.session_state.session_docs.append(name)
+                st.session_state.session_has_docs = True
+                llm_utils.save_chat_session(
+                    session_id=st.session_state.session_id,
+                    title=st.session_state.session_title,
+                    messages=st.session_state.messages,
+                    created=st.session_state.session_created,
+                    docs=st.session_state.session_docs,
+                )
+                st.success(f"Indexed {len(new_names)} file(s)")
+        if st.session_state.session_docs:
+            for doc_name in st.session_state.session_docs:
+                st.caption(f":page_facing_up: {doc_name}")
+        else:
+            st.caption("No documents attached.")
+
+    with att_col2:
+        st.caption(":frame_with_picture: **Image**")
+        uploaded_img = st.file_uploader(
+            "Attach an image",
+            type=["jpg", "jpeg", "png"],
+            key=f"img_upload_{st.session_state.uploader_key}",
+            accept_multiple_files=False,
+            label_visibility="collapsed",
+        )
+        if uploaded_img:
+            st.session_state.pending_image = llm_utils.encode_image(uploaded_img)
+            st.image(llm_utils.display_uploaded_image(uploaded_img), width=200)
+        elif not st.session_state.pending_image:
+            st.caption("No image attached.")
 
 # --- Chat input ---
 if user_input := st.chat_input("Ask JARVIS anything..."):
+    # Build user message content — multimodal if an image is attached
+    if st.session_state.pending_image:
+        user_content = [
+            {"type": "text", "text": user_input},
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/png;base64,{st.session_state.pending_image}"
+                },
+            },
+        ]
+        st.session_state.pending_image = None
+    else:
+        user_content = user_input
+
     # Show and store user message
-    st.session_state.messages.append({"role": "user", "content": user_input})
+    st.session_state.messages.append({"role": "user", "content": user_content})
     with st.chat_message("user"):
-        st.markdown(user_input)
+        if isinstance(user_content, list):
+            st.markdown(user_content[0]["text"])
+            b64_data = user_content[1]["image_url"]["url"].split(",")[1]
+            st.image(Image.open(io.BytesIO(base64.b64decode(b64_data))), width=250)
+        else:
+            st.markdown(user_content)
 
     # Build API payload — inject RAG context if docs are attached
     if st.session_state.session_has_docs:
@@ -274,8 +329,9 @@ if user_input := st.chat_input("Ask JARVIS anything..."):
             f"chat_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
         )
         st.session_state.session_created = datetime.now().isoformat()
-        st.session_state.session_title = user_input[:50] + (
-            "..." if len(user_input) > 50 else ""
+        title_text = user_input if isinstance(user_content, str) else user_input
+        st.session_state.session_title = title_text[:50] + (
+            "..." if len(title_text) > 50 else ""
         )
 
     llm_utils.save_chat_session(
