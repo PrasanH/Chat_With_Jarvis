@@ -197,7 +197,7 @@ with st.expander(":gear: Settings", expanded=False):
     )
     preset = st.selectbox(
         ":blue[System prompt preset]",
-        options=content.pre_defined_content,
+        options=list(content.pre_defined_content.keys()),
         key="preset_select",
     )
     custom_prompt = st.text_area(
@@ -216,11 +216,10 @@ with st.expander(":gear: Settings", expanded=False):
 
 # Determine active system prompt from session state
 _custom = st.session_state.get("custom_prompt", "").strip()
-system_prompt = (
-    _custom
-    if _custom
-    else st.session_state.get("preset_select", content.pre_defined_content[0])
+_preset_key = st.session_state.get(
+    "preset_select", next(iter(content.pre_defined_content))
 )
+system_prompt = _custom if _custom else content.pre_defined_content[_preset_key]
 
 # --- Display current conversation ---
 for msg in st.session_state.messages:
