@@ -1,5 +1,6 @@
 import streamlit as st
 import app_utils.llm_utils as llm_utils
+from app_utils.config import models, gpt_default
 from dotenv import load_dotenv
 
 
@@ -22,20 +23,18 @@ def main():
         accept_multiple_files=True,
         type=["pdf", "docx"],
     )
-    
 
     model = st.selectbox(
         label=":blue[Select model]",
-        options=["gpt-4.1-2025-04-14", "gpt-4.1-mini-2025-04-14", "gpt-5-2025-08-07","gpt-5-mini-2025-08-07"],
-        index=1,
-        
+        options=models["GPT models"],
+        index=models["GPT models"].index(gpt_default),
     )
 
     if st.button("Process"):
 
         with st.spinner("Chunking the documents and setting up VectorStore..."):
 
-            # Get raw text from uploaded docs ( .pdf or .docx) 
+            # Get raw text from uploaded docs ( .pdf or .docx)
 
             raw_text = llm_utils.get_text_from_documents(uploaded_docs)
             # st.write(raw_text)   # debugging
@@ -43,16 +42,16 @@ def main():
             # Split the extracted raw text into smaller text chunks
 
             text_chunks = llm_utils.get_text_chunks(raw_text)
-            #st.write(text_chunks)    # debugging
+            # st.write(text_chunks)    # debugging
 
             # Create a vector store (embedding vector database) from the text chunks
             vectorstore = llm_utils.get_vectorstore(text_chunks)
-            
 
             # Initialize the conversational retrieval chain with the vector store and model
 
-            st.session_state.conversation = llm_utils.get_convo_chain(vectorstore, model)
-
+            st.session_state.conversation = llm_utils.get_convo_chain(
+                vectorstore, model
+            )
 
     user_question = st.text_area(":blue[Type your question]")
 

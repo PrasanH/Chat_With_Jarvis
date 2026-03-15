@@ -16,6 +16,7 @@ from langchain.chains import ConversationalRetrievalChain  ### to chat with our 
 
 # from langchain.chat_models import ChatOpenAI
 from langchain_community.chat_models import ChatOpenAI
+from app_utils.config import gpt_default
 
 from langchain_community.llms import HuggingFaceHub
 
@@ -145,19 +146,19 @@ def get_vectorstore(text_chunks: List[str], vector_db: str = "chromadb"):
     return vectorstore
 
 
-def get_convo_chain(vectorstore, model="gpt-3.5-turbo"):
+def get_convo_chain(vectorstore, model=None):
     """
     Creates and returns a conversational retrieval chain using a specified LLM.
 
     Args:
         vectorstore: A vector store instance that supports retrieval with `as_retriever()` method.
-        model (str): LLM model to use.  default is "gpt-3.5-turbo".
+        model (str): LLM model to use.  Defaults to gpt_default from config.
 
     Returns:
         ConversationalRetrievalChain: An instance that handles conversational retrieval with memory.
     """
 
-    llm = ChatOpenAI(model=model)
+    llm = ChatOpenAI(model=model or gpt_default)
 
     # Create a conversation memory buffer to keep track of chat history
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)

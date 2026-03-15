@@ -6,6 +6,7 @@ from datetime import datetime
 import app_utils.llm_utils as llm_utils
 import app_utils.folder_rag_utils as rag
 from app_utils import content
+from app_utils.config import models, gpt_default
 
 load_dotenv()
 
@@ -187,19 +188,8 @@ st.header(":robot_face: Chat with JARVIS")
 with st.expander(":gear: Settings", expanded=False):
     model = st.selectbox(
         "Model",
-        options=[
-            "gpt-5-2025-08-07",
-            "gpt-5-mini-2025-08-07",
-            "gpt-4.1-mini-2025-04-14",
-            "gpt-4o",
-            "gpt-4o-mini",
-            "gpt-4.1-2025-04-14",
-            "chatgpt-4o-latest",
-            "gpt-4o-mini-2024-07-18",
-            "gpt-4o-mini-search-preview",
-            "gpt-4o-search-preview",
-        ],
-        index=2,
+        options=models["GPT models"],
+        index=models["GPT models"].index(gpt_default),
         key="model_select",
     )
     preset = st.selectbox(
@@ -257,7 +247,7 @@ if user_input := st.chat_input("Ask JARVIS anything..."):
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             response = client.chat.completions.create(
-                model=st.session_state.get("model_select", "gpt-4.1-mini-2025-04-14"),
+                model=st.session_state.get("model_select", gpt_default),
                 messages=api_messages,
             )
             reply = response.choices[0].message.content

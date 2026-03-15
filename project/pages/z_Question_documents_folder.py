@@ -1,5 +1,6 @@
 import streamlit as st
 import app_utils.folder_rag_utils as folder_rag_utils
+from app_utils.config import models, gpt_default
 from dotenv import load_dotenv
 import os
 
@@ -68,13 +69,8 @@ def main():
     if collection_option != "Delete Collection":
         model = st.selectbox(
             label=":blue[Select model]",
-            options=[
-                "gpt-4.1-2025-04-14",
-                "gpt-4.1-mini-2025-04-14",
-                "gpt-5-2025-08-07",
-                "gpt-5-mini-2025-08-07",
-            ],
-            index=1,
+            options=models["GPT models"],
+            index=models["GPT models"].index(gpt_default),
         )
 
         if collection_option == "Create New Collection":
