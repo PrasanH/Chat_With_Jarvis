@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import MagicMock, patch
 from streamlit.testing.v1 import AppTest
 
 import sys
@@ -14,6 +15,16 @@ tests b_Chat_with_Jarvis.py page.
 
 Just inputs a question
 """
+
+
+@pytest.fixture(autouse=True)
+def mock_llm(monkeypatch):
+    """Patch OpenAI and get_llm_reply so tests run without a real API key."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    with patch("openai.OpenAI", return_value=MagicMock()), patch(
+        "app_utils.llm_utils.get_llm_reply", return_value="Mocked reply"
+    ):
+        yield
 
 
 @pytest.fixture
