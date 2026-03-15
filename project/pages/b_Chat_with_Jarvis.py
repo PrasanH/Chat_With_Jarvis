@@ -190,18 +190,18 @@ st.header(":robot_face: Chat with JARVIS")
 
 with st.expander(":gear: Settings", expanded=False):
     model = st.selectbox(
-        "Model",
+        ":blue[Model]",
         options=models["GPT models"],
         index=models["GPT models"].index(gpt_default),
         key="model_select",
     )
     preset = st.selectbox(
-        "System prompt preset",
+        ":blue[System prompt preset]",
         options=content.pre_defined_content,
         key="preset_select",
     )
     custom_prompt = st.text_area(
-        "Or type a custom system prompt (overrides preset)", key="custom_prompt"
+        ":blue[Or type a custom system prompt (overrides preset)]", key="custom_prompt"
     )
     if llm_utils._model_supports_reasoning(
         st.session_state.get("model_select", gpt_default)
