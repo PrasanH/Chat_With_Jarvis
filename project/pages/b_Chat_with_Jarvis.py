@@ -6,6 +6,7 @@ import streamlit as st
 from openai import OpenAI
 from PIL import Image
 from datetime import datetime
+from google import genai
 import app_utils.llm_utils as llm_utils
 import app_utils.folder_rag_utils as rag
 from app_utils import content
@@ -14,6 +15,7 @@ from app_utils.config import models, gpt_default
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 st.set_page_config(
     page_title="Chat with JARVIS", page_icon=":robot_face:", layout="wide"
@@ -152,10 +154,26 @@ with st.sidebar:
 st.header(":robot_face: Chat with JARVIS")
 
 with st.expander(":gear: Settings", expanded=False):
+    provider = st.radio(
+        ":blue[Provider]",
+        options=["GPT", "Gemini"],
+        horizontal=True,
+        key="provider_select",
+    )
+    _model_options = (
+        models["GPT models"]
+        if st.session_state.get("provider_select", "GPT") == "GPT"
+        else models["Gemini models"]
+    )
+    _default_idx = (
+        models["GPT models"].index(gpt_default)
+        if st.session_state.get("provider_select", "GPT") == "GPT"
+        else 0
+    )
     model = st.selectbox(
         ":blue[Model]",
-        options=models["GPT models"],
-        index=models["GPT models"].index(gpt_default),
+        options=_model_options,
+        index=_default_idx,
         key="model_select",
     )
     preset = st.selectbox(
@@ -166,7 +184,9 @@ with st.expander(":gear: Settings", expanded=False):
     custom_prompt = st.text_area(
         ":blue[Or type a custom system prompt (overrides preset)]", key="custom_prompt"
     )
-    if llm_utils._model_supports_reasoning(
+    if st.session_state.get(
+        "provider_select", "GPT"
+    ) == "GPT" and llm_utils._model_supports_reasoning(
         st.session_state.get("model_select", gpt_default)
     ):
         st.selectbox(
@@ -318,6 +338,7 @@ if user_input := st.chat_input("Ask JARVIS anything..."):
                 model=st.session_state.get("model_select", gpt_default),
                 messages=api_messages,
                 reasoning_effort=st.session_state.get("reasoning_effort", "low"),
+                gemini_client=gemini_client,
             )
         st.markdown(reply)
 

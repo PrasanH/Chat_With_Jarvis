@@ -345,6 +345,58 @@ def rename_chat_session(session_id: str, new_title: str):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
+def _is_gemini_model(model: str) -> bool:
+    """Return True if the model is a Gemini model."""
+    return model.lower().startswith("gemini")
+
+
+def _convert_messages_for_gemini(messages: list) -> list:
+    """
+    Convert OpenAI-style messages to Gemini format.
+
+    - 'system' role: extracted and prepended into the first 'user' message.
+    - 'assistant' role: renamed to 'model'.
+    """
+    result = []
+    system_content = None
+
+    for msg in messages:
+        role = msg["role"]
+        content = msg["content"]
+
+        if role == "system":
+            system_content = content
+            continue
+
+        if role == "assistant":
+            role = "model"
+
+        # Prepend system prompt into the first user message
+        if role == "user" and system_content and not result:
+            if isinstance(content, str):
+                content = f"{system_content}\n\n{content}"
+            elif isinstance(content, list):
+                new_parts = []
+                prepended = False
+                for part in content:
+                    if part["type"] == "text" and not prepended:
+                        new_parts.append(
+                            {
+                                "type": "text",
+                                "text": f"{system_content}\n\n{part['text']}",
+                            }
+                        )
+                        prepended = True
+                    else:
+                        new_parts.append(part)
+                content = new_parts
+            system_content = None
+
+        result.append({"role": role, "content": content})
+
+    return result
+
+
 def _model_supports_reasoning(model: str) -> bool:
     """Return True if the model name indicates GPT-5 or higher."""
     import re
@@ -358,23 +410,37 @@ def get_llm_reply(
     model: str,
     messages: list,
     reasoning_effort: str = "low",
+    gemini_client=None,
 ) -> str:
     """
     Send a chat request and return the assistant reply text.
 
-    Uses ``client.responses.create`` (with reasoning) for GPT-5+ models and
-    ``client.chat.completions.create`` for all other models.
+    Routes to Gemini via ``gemini_client.interactions.create`` for Gemini models,
+    uses ``client.responses.create`` (with reasoning) for GPT-5+ models, and
+    ``client.chat.completions.create`` for all other OpenAI models.
 
     Args:
         client: An ``openai.OpenAI`` client instance.
         model (str): Model identifier, e.g. ``"gpt-4.1-mini-2025-04-14"``.
         messages (list): List of ``{"role": ..., "content": ...}`` dicts.
         reasoning_effort (str): ``"low"`` (default), ``"medium"``, or
-            ``"high"``.  Ignored for non-GPT-5 models.
+            ``"high"``.  Ignored for non-GPT-5 and Gemini models.
+        gemini_client: A ``google.genai.Client`` instance. Required when
+            using a Gemini model.
 
     Returns:
         str: The assistant's reply text.
     """
+    if _is_gemini_model(model):
+        if gemini_client is None:
+            raise ValueError("gemini_client must be provided for Gemini models.")
+        gemini_messages = _convert_messages_for_gemini(messages)
+        response = gemini_client.interactions.create(
+            model=model,
+            input=gemini_messages,
+        )
+        return response.outputs[-1].text
+
     if reasoning_effort not in VALID_REASONING_EFFORTS:
         raise ValueError(
             f"reasoning_effort must be one of {VALID_REASONING_EFFORTS}, "
