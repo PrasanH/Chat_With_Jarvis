@@ -29,10 +29,10 @@ def test_app_loads_without_errors(app):
 
 
 def test_selectbox_contains_selected_prompt(app):
-    """Test that 'You are an expert in programming' is in selectbox options"""
+    """Test that 'Programming expert' is in selectbox options"""
     at = app.run()
     # selectbox[0] = Model, selectbox[1] = System prompt preset
-    assert "You are an expert in programming" in at.selectbox[1].options
+    assert "Programming expert" in at.selectbox[1].options
 
 
 def test_selectbox_has_multiple_options(app):
@@ -52,8 +52,8 @@ def test_user_question_input(app):
 def test_complete_interaction_flow(app):
     """Test complete user interaction: select prompt and input question"""
     at = app.run()
-    at.selectbox[1].set_value("You are an expert in programming").run()
+    at.selectbox[1].set_value("Programming expert").run()
     at.chat_input[0].set_value("What is Python?").run()
 
-    assert at.selectbox[1].value == "You are an expert in programming"
+    assert at.selectbox[1].value == "Programming expert"
     assert not at.exception
