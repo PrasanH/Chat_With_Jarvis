@@ -9,7 +9,12 @@ models = {
         "o4-mini",
         "gpt-4o-mini-search-preview",
         "gpt-4o-search-preview",
-    ]
+    ],
+    "Gemini models": [
+        "gemini-3-flash-preview",   
+        "gemini-2.5-flash-lite", 
+        "gemini-3.1-pro-preview",
+    ],
 }
 
 gpt_default = "gpt-4.1-mini-2025-04-14"
