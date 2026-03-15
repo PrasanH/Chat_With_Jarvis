@@ -1,10 +1,7 @@
 import os
-import io
-import base64
 from dotenv import load_dotenv
 import streamlit as st
 from openai import OpenAI
-from PIL import Image
 from datetime import datetime
 from google import genai
 import app_utils.llm_utils as llm_utils
@@ -212,10 +209,7 @@ for msg in st.session_state.messages:
                 if part["type"] == "text":
                     st.markdown(part["text"])
                 elif part["type"] == "image_url":
-                    b64_data = part["image_url"]["url"].split(",")[1]
-                    st.image(
-                        Image.open(io.BytesIO(base64.b64decode(b64_data))), width=300
-                    )
+                    st.image(part["image_url"]["url"], width=300)
         else:
             st.markdown(msg["content"])
 
@@ -277,7 +271,8 @@ with st.expander(":paperclip: Attach files", expanded=False):
         )
         if uploaded_img:
             st.session_state.pending_image = llm_utils.encode_image(uploaded_img)
-            st.image(llm_utils.display_uploaded_image(uploaded_img), width=200)
+            # encode_image returns a full data URI; pass it directly to st.image
+            st.image(st.session_state.pending_image, width=200)
         elif not st.session_state.pending_image:
             st.caption("No image attached.")
 
@@ -290,7 +285,7 @@ if user_input := st.chat_input("Ask JARVIS anything..."):
             {
                 "type": "image_url",
                 "image_url": {
-                    "url": f"data:image/png;base64,{st.session_state.pending_image}"
+                    "url": st.session_state.pending_image  # full data URI with correct MIME type
                 },
             },
         ]
@@ -303,8 +298,7 @@ if user_input := st.chat_input("Ask JARVIS anything..."):
     with st.chat_message("user"):
         if isinstance(user_content, list):
             st.markdown(user_content[0]["text"])
-            b64_data = user_content[1]["image_url"]["url"].split(",")[1]
-            st.image(Image.open(io.BytesIO(base64.b64decode(b64_data))), width=250)
+            st.image(user_content[1]["image_url"]["url"], width=250)
         else:
             st.markdown(user_content)
 

@@ -28,9 +28,11 @@ from langchain_community.llms import HuggingFaceHub
 from langchain_community.vectorstores import Chroma
 from docx import Document
 import os
+import io
 
 import base64
 from PIL import Image
+from google.genai import types as genai_types
 
 from datetime import datetime
 import json
@@ -202,19 +204,25 @@ def handle_user_input(user_question, conversation):
 
 def encode_image(uploaded_image):
     """
-    Encodes an uploaded image to base64 string.
-    Requires base64 module
+    Encodes an uploaded image to a base64 data URI string.
+
+    Equivalent to the JS FileReader.readAsDataURL approach:
+        reader.readAsDataURL(file)  →  "data:<mime>;base64,<data>"
+    The MIME type is detected from the image itself (not hardcoded),
+    so JPEG, PNG, WEBP, etc. are all handled correctly.
 
     Args:
         uploaded_image (UploadedFile): The uploaded image file from Streamlit.
 
     Returns:
-        str: Base64 encoded string of the image
+        str: Full data URI, e.g. ``"data:image/jpeg;base64,/9j/4AAQ..."
     """
+    uploaded_image.seek(0)
     image_bytes = uploaded_image.read()
+    mime_type = Image.open(io.BytesIO(image_bytes)).format
+    mime_str = f"image/{mime_type.lower()}" if mime_type else "image/png"
     base64_str = base64.b64encode(image_bytes).decode("utf-8")
-
-    return base64_str
+    return f"data:{mime_str};base64,{base64_str}"
 
 
 def display_uploaded_image(uploaded_image):
@@ -224,6 +232,7 @@ def display_uploaded_image(uploaded_image):
     Args:
         uploaded_image (_type_): The uploaded image file from Streamlit.
     """
+    uploaded_image.seek(0)
     image_to_display = Image.open(uploaded_image)
     return image_to_display
 
@@ -350,51 +359,61 @@ def _is_gemini_model(model: str) -> bool:
     return model.lower().startswith("gemini")
 
 
-def _convert_messages_for_gemini(messages: list) -> list:
+def _convert_messages_for_gemini(
+    messages: list,
+) -> tuple[list[genai_types.Content], str | None]:
     """
-    Convert OpenAI-style messages to Gemini format.
+    Convert OpenAI-style messages to a list of ``types.Content`` objects
+    for ``client.models.generate_content``.
 
-    - 'system' role: extracted and prepended into the first 'user' message.
-    - 'assistant' role: renamed to 'model'.
+    Returns:
+        (contents, system_instruction) where ``system_instruction`` is the
+        extracted system prompt string (or None), suitable for passing as
+        the ``config`` system_instruction field.
     """
-    result = []
-    system_content = None
+    contents = []
+    system_instruction = None
 
     for msg in messages:
         role = msg["role"]
         content = msg["content"]
 
         if role == "system":
-            system_content = content
+            system_instruction = content
             continue
 
-        if role == "assistant":
-            role = "model"
+        gemini_role = "model" if role == "assistant" else role
 
-        # Prepend system prompt into the first user message
-        if role == "user" and system_content and not result:
-            if isinstance(content, str):
-                content = f"{system_content}\n\n{content}"
-            elif isinstance(content, list):
-                new_parts = []
-                prepended = False
-                for part in content:
-                    if part["type"] == "text" and not prepended:
-                        new_parts.append(
-                            {
-                                "type": "text",
-                                "text": f"{system_content}\n\n{part['text']}",
-                            }
+        if isinstance(content, list):
+            # Multimodal message — build types.Part list
+            parts = []
+            for part in content:
+                if part["type"] == "text":
+                    parts.append(genai_types.Part(text=part["text"]))
+                elif part["type"] == "image_url":
+                    url = part["image_url"]["url"]
+                    if url.startswith("data:"):
+                        header, data = url.split(",", 1)
+                        mime_type = header.split(";")[0].split(":")[1]
+                        parts.append(
+                            genai_types.Part(
+                                inline_data=genai_types.Blob(
+                                    mime_type=mime_type,
+                                    data=base64.b64decode(data),
+                                )
+                            )
                         )
-                        prepended = True
-                    else:
-                        new_parts.append(part)
-                content = new_parts
-            system_content = None
+            contents.append(genai_types.Content(role=gemini_role, parts=parts))
+        else:
+            # Text-only message
+            contents.append(
+                genai_types.Content(
+                    role=gemini_role,
+                    parts=[genai_types.Part(text=content)],
+                )
+            )
 
-        result.append({"role": role, "content": content})
-
-    return result
+    return contents, system_instruction
 
 
 def _model_supports_reasoning(model: str) -> bool:
@@ -434,12 +453,18 @@ def get_llm_reply(
     if _is_gemini_model(model):
         if gemini_client is None:
             raise ValueError("gemini_client must be provided for Gemini models.")
-        gemini_messages = _convert_messages_for_gemini(messages)
-        response = gemini_client.interactions.create(
-            model=model,
-            input=gemini_messages,
+        contents, system_instruction = _convert_messages_for_gemini(messages)
+        cfg = (
+            genai_types.GenerateContentConfig(system_instruction=system_instruction)
+            if system_instruction
+            else None
         )
-        return response.outputs[-1].text
+        response = gemini_client.models.generate_content(
+            model=model,
+            contents=contents,
+            config=cfg,
+        )
+        return response.text
 
     if reasoning_effort not in VALID_REASONING_EFFORTS:
         raise ValueError(
