@@ -200,6 +200,16 @@ with st.expander(":gear: Settings", expanded=False):
     custom_prompt = st.text_area(
         "Or type a custom system prompt (overrides preset)", key="custom_prompt"
     )
+    if llm_utils._model_supports_reasoning(
+        st.session_state.get("model_select", gpt_default)
+    ):
+        st.selectbox(
+            "Reasoning effort",
+            options=["low", "medium", "high"],
+            index=0,
+            key="reasoning_effort",
+            help="Only available for GPT-5+ models.",
+        )
 
 # Determine active system prompt from session state
 _custom = st.session_state.get("custom_prompt", "").strip()
@@ -245,12 +255,13 @@ if user_input := st.chat_input("Ask JARVIS anything..."):
 
     # Get and display reply
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            response = client.chat.completions.create(
+        with st.spinner("Generating response..."):
+            reply = llm_utils.get_llm_reply(
+                client=client,
                 model=st.session_state.get("model_select", gpt_default),
                 messages=api_messages,
+                reasoning_effort=st.session_state.get("reasoning_effort", "low"),
             )
-            reply = response.choices[0].message.content
         st.markdown(reply)
 
     st.session_state.messages.append({"role": "assistant", "content": reply})

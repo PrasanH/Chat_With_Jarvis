@@ -16,7 +16,11 @@ from langchain.chains import ConversationalRetrievalChain  ### to chat with our 
 
 # from langchain.chat_models import ChatOpenAI
 from langchain_community.chat_models import ChatOpenAI
-from app_utils.config import gpt_default
+from app_utils.config import (
+    gpt_default,
+    REASONING_MODELS_MIN_VERSION,
+    VALID_REASONING_EFFORTS,
+)
 
 from langchain_community.llms import HuggingFaceHub
 
@@ -339,3 +343,54 @@ def rename_chat_session(session_id: str, new_title: str):
     file_path = os.path.join(chat_log_dir, f"{session_id}.json")
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def _model_supports_reasoning(model: str) -> bool:
+    """Return True if the model name indicates GPT-5 or higher."""
+    import re
+
+    match = re.search(r"gpt-(\d+)", model.lower())
+    return bool(match and int(match.group(1)) >= REASONING_MODELS_MIN_VERSION)
+
+
+def get_llm_reply(
+    client,
+    model: str,
+    messages: list,
+    reasoning_effort: str = "low",
+) -> str:
+    """
+    Send a chat request and return the assistant reply text.
+
+    Uses ``client.responses.create`` (with reasoning) for GPT-5+ models and
+    ``client.chat.completions.create`` for all other models.
+
+    Args:
+        client: An ``openai.OpenAI`` client instance.
+        model (str): Model identifier, e.g. ``"gpt-4.1-mini-2025-04-14"``.
+        messages (list): List of ``{"role": ..., "content": ...}`` dicts.
+        reasoning_effort (str): ``"low"`` (default), ``"medium"``, or
+            ``"high"``.  Ignored for non-GPT-5 models.
+
+    Returns:
+        str: The assistant's reply text.
+    """
+    if reasoning_effort not in VALID_REASONING_EFFORTS:
+        raise ValueError(
+            f"reasoning_effort must be one of {VALID_REASONING_EFFORTS}, "
+            f"got '{reasoning_effort}'"
+        )
+
+    if _model_supports_reasoning(model):
+        response = client.responses.create(
+            model=model,
+            reasoning={"effort": reasoning_effort},
+            input=messages,
+        )
+        return response.output_text
+    else:
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+        )
+        return response.choices[0].message.content
