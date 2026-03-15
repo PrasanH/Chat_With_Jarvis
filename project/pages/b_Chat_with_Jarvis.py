@@ -35,6 +35,7 @@ if "renaming_session_id" not in st.session_state:
 
 # --- Helpers ---
 def start_new_chat():
+    """Start a blank unsaved chat."""
     st.session_state.session_id = None
     st.session_state.messages = []
     st.session_state.session_title = "New Chat"
@@ -44,6 +45,7 @@ def start_new_chat():
 
 
 def load_session(session_id: str):
+    """Load a saved session into state."""
     data = llm_utils.load_chat_session(session_id)
     if data:
         st.session_state.session_id = data["id"]
@@ -55,6 +57,7 @@ def load_session(session_id: str):
 
 
 def delete_session(session_id: str):
+    """Delete a session and its associated Chroma collection."""
     rag.delete_collection(session_id)  # remove associated Chroma collection
     llm_utils.delete_chat_session(session_id)
     if st.session_state.session_id == session_id:
