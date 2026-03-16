@@ -312,7 +312,7 @@ if user_input := st.chat_input("Ask JARVIS anything..."):
             rag_system = (
                 f"{system_prompt}\n\n"
                 "Use the document excerpts below to answer when relevant. "
-                "Cite the source file and page number.\n\n"
+                "Cite the source file and page number.If you do not find the answer, say 'I don't know'.\n\n"
                 f"Document context:\n{ctx_text}"
             )
         else:
