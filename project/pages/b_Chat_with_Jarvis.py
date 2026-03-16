@@ -1,19 +1,24 @@
 import os
-import io
-import base64
 from dotenv import load_dotenv
 import streamlit as st
 from openai import OpenAI
-from PIL import Image
 from datetime import datetime
+from google import genai
 import app_utils.llm_utils as llm_utils
 import app_utils.folder_rag_utils as rag
 from app_utils import content
-from app_utils.config import models, gpt_default
+from app_utils.config import (
+    models,
+    gpt_default,
+    VALID_THINKING_LEVELS,
+    GEMINI_FLASH_THINKING_DEFAULT,
+    GEMINI_PRO_THINKING_DEFAULT,
+)
 
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 st.set_page_config(
     page_title="Chat with JARVIS", page_icon=":robot_face:", layout="wide"
@@ -152,10 +157,26 @@ with st.sidebar:
 st.header(":robot_face: Chat with JARVIS")
 
 with st.expander(":gear: Settings", expanded=False):
+    provider = st.radio(
+        ":blue[Provider]",
+        options=["GPT", "Gemini"],
+        horizontal=True,
+        key="provider_select",
+    )
+    _model_options = (
+        models["GPT models"]
+        if st.session_state.get("provider_select", "GPT") == "GPT"
+        else models["Gemini models"]
+    )
+    _default_idx = (
+        models["GPT models"].index(gpt_default)
+        if st.session_state.get("provider_select", "GPT") == "GPT"
+        else 0
+    )
     model = st.selectbox(
         ":blue[Model]",
-        options=models["GPT models"],
-        index=models["GPT models"].index(gpt_default),
+        options=_model_options,
+        index=_default_idx,
         key="model_select",
     )
     preset = st.selectbox(
@@ -166,7 +187,9 @@ with st.expander(":gear: Settings", expanded=False):
     custom_prompt = st.text_area(
         ":blue[Or type a custom system prompt (overrides preset)]", key="custom_prompt"
     )
-    if llm_utils._model_supports_reasoning(
+    if st.session_state.get(
+        "provider_select", "GPT"
+    ) == "GPT" and llm_utils._model_supports_reasoning(
         st.session_state.get("model_select", gpt_default)
     ):
         st.selectbox(
@@ -175,6 +198,21 @@ with st.expander(":gear: Settings", expanded=False):
             index=0,
             key="reasoning_effort",
             help="Only available for GPT-5+ models.",
+        )
+
+    if st.session_state.get("provider_select", "GPT") == "Gemini":
+        _selected_model = st.session_state.get("model_select", "")
+        _thinking_default = (
+            GEMINI_FLASH_THINKING_DEFAULT
+            if "flash" in _selected_model.lower()
+            else GEMINI_PRO_THINKING_DEFAULT
+        )
+        st.selectbox(
+            ":bulb: Thinking level",
+            options=list(VALID_THINKING_LEVELS),
+            index=list(VALID_THINKING_LEVELS).index(_thinking_default),
+            key="thinking_level",
+            help="Controls Gemini's internal reasoning depth. Flash default: minimal. Pro default: low.",
         )
 
 # Determine active system prompt from session state
@@ -192,10 +230,7 @@ for msg in st.session_state.messages:
                 if part["type"] == "text":
                     st.markdown(part["text"])
                 elif part["type"] == "image_url":
-                    b64_data = part["image_url"]["url"].split(",")[1]
-                    st.image(
-                        Image.open(io.BytesIO(base64.b64decode(b64_data))), width=300
-                    )
+                    st.image(part["image_url"]["url"], width=300)
         else:
             st.markdown(msg["content"])
 
@@ -257,7 +292,8 @@ with st.expander(":paperclip: Attach files", expanded=False):
         )
         if uploaded_img:
             st.session_state.pending_image = llm_utils.encode_image(uploaded_img)
-            st.image(llm_utils.display_uploaded_image(uploaded_img), width=200)
+            # encode_image returns a full data URI; pass it directly to st.image
+            st.image(st.session_state.pending_image, width=200)
         elif not st.session_state.pending_image:
             st.caption("No image attached.")
 
@@ -270,7 +306,7 @@ if user_input := st.chat_input("Ask JARVIS anything..."):
             {
                 "type": "image_url",
                 "image_url": {
-                    "url": f"data:image/png;base64,{st.session_state.pending_image}"
+                    "url": st.session_state.pending_image  # full data URI with correct MIME type
                 },
             },
         ]
@@ -283,8 +319,7 @@ if user_input := st.chat_input("Ask JARVIS anything..."):
     with st.chat_message("user"):
         if isinstance(user_content, list):
             st.markdown(user_content[0]["text"])
-            b64_data = user_content[1]["image_url"]["url"].split(",")[1]
-            st.image(Image.open(io.BytesIO(base64.b64decode(b64_data))), width=250)
+            st.image(user_content[1]["image_url"]["url"], width=250)
         else:
             st.markdown(user_content)
 
@@ -298,7 +333,7 @@ if user_input := st.chat_input("Ask JARVIS anything..."):
             rag_system = (
                 f"{system_prompt}\n\n"
                 "Use the document excerpts below to answer when relevant. "
-                "Cite the source file and page number.\n\n"
+                "Cite the source file and page number.If you do not find the answer, say 'I don't know'.\n\n"
                 f"Document context:\n{ctx_text}"
             )
         else:
@@ -318,6 +353,8 @@ if user_input := st.chat_input("Ask JARVIS anything..."):
                 model=st.session_state.get("model_select", gpt_default),
                 messages=api_messages,
                 reasoning_effort=st.session_state.get("reasoning_effort", "low"),
+                gemini_client=gemini_client,
+                thinking_level=st.session_state.get("thinking_level", None),
             )
         st.markdown(reply)
 

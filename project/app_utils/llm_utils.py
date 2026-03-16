@@ -20,6 +20,9 @@ from app_utils.config import (
     gpt_default,
     REASONING_MODELS_MIN_VERSION,
     VALID_REASONING_EFFORTS,
+    VALID_THINKING_LEVELS,
+    GEMINI_FLASH_THINKING_DEFAULT,
+    GEMINI_PRO_THINKING_DEFAULT,
 )
 
 from langchain_community.llms import HuggingFaceHub
@@ -28,9 +31,11 @@ from langchain_community.llms import HuggingFaceHub
 from langchain_community.vectorstores import Chroma
 from docx import Document
 import os
+import io
 
 import base64
 from PIL import Image
+from google.genai import types as genai_types
 
 from datetime import datetime
 import json
@@ -202,19 +207,25 @@ def handle_user_input(user_question, conversation):
 
 def encode_image(uploaded_image):
     """
-    Encodes an uploaded image to base64 string.
-    Requires base64 module
+    Encodes an uploaded image to a base64 data URI string.
+
+    Equivalent to the JS FileReader.readAsDataURL approach:
+        reader.readAsDataURL(file)  →  "data:<mime>;base64,<data>"
+    The MIME type is detected from the image itself (not hardcoded),
+    so JPEG, PNG, WEBP, etc. are all handled correctly.
 
     Args:
         uploaded_image (UploadedFile): The uploaded image file from Streamlit.
 
     Returns:
-        str: Base64 encoded string of the image
+        str: Full data URI, e.g. ``"data:image/jpeg;base64,/9j/4AAQ..."
     """
+    uploaded_image.seek(0)
     image_bytes = uploaded_image.read()
+    mime_type = Image.open(io.BytesIO(image_bytes)).format
+    mime_str = f"image/{mime_type.lower()}" if mime_type else "image/png"
     base64_str = base64.b64encode(image_bytes).decode("utf-8")
-
-    return base64_str
+    return f"data:{mime_str};base64,{base64_str}"
 
 
 def display_uploaded_image(uploaded_image):
@@ -224,6 +235,7 @@ def display_uploaded_image(uploaded_image):
     Args:
         uploaded_image (_type_): The uploaded image file from Streamlit.
     """
+    uploaded_image.seek(0)
     image_to_display = Image.open(uploaded_image)
     return image_to_display
 
@@ -345,6 +357,68 @@ def rename_chat_session(session_id: str, new_title: str):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
+def _is_gemini_model(model: str) -> bool:
+    """Return True if the model is a Gemini model."""
+    return model.lower().startswith("gemini")
+
+
+def _convert_messages_for_gemini(
+    messages: list,
+) -> tuple[list[genai_types.Content], str | None]:
+    """
+    Convert OpenAI-style messages to a list of ``types.Content`` objects
+    for ``client.models.generate_content``.
+
+    Returns:
+        (contents, system_instruction) where ``system_instruction`` is the
+        extracted system prompt string (or None), suitable for passing as
+        the ``config`` system_instruction field.
+    """
+    contents = []
+    system_instruction = None
+
+    for msg in messages:
+        role = msg["role"]
+        content = msg["content"]
+
+        if role == "system":
+            system_instruction = content
+            continue
+
+        gemini_role = "model" if role == "assistant" else role
+
+        if isinstance(content, list):
+            # Multimodal message — build types.Part list
+            parts = []
+            for part in content:
+                if part["type"] == "text":
+                    parts.append(genai_types.Part(text=part["text"]))
+                elif part["type"] == "image_url":
+                    url = part["image_url"]["url"]
+                    if url.startswith("data:"):
+                        header, data = url.split(",", 1)
+                        mime_type = header.split(";")[0].split(":")[1]
+                        parts.append(
+                            genai_types.Part(
+                                inline_data=genai_types.Blob(
+                                    mime_type=mime_type,
+                                    data=base64.b64decode(data),
+                                )
+                            )
+                        )
+            contents.append(genai_types.Content(role=gemini_role, parts=parts))
+        else:
+            # Text-only message
+            contents.append(
+                genai_types.Content(
+                    role=gemini_role,
+                    parts=[genai_types.Part(text=content)],
+                )
+            )
+
+    return contents, system_instruction
+
+
 def _model_supports_reasoning(model: str) -> bool:
     """Return True if the model name indicates GPT-5 or higher."""
     import re
@@ -353,28 +427,76 @@ def _model_supports_reasoning(model: str) -> bool:
     return bool(match and int(match.group(1)) >= REASONING_MODELS_MIN_VERSION)
 
 
+def _is_gemini_flash(model: str) -> bool:
+    """Return True if the Gemini model is a flash variant."""
+    return "flash" in model.lower()
+
+
 def get_llm_reply(
     client,
     model: str,
     messages: list,
     reasoning_effort: str = "low",
+    gemini_client=None,
+    thinking_level: str = None,
 ) -> str:
     """
     Send a chat request and return the assistant reply text.
 
-    Uses ``client.responses.create`` (with reasoning) for GPT-5+ models and
-    ``client.chat.completions.create`` for all other models.
+    Routes to Gemini via ``gemini_client.models.generate_content`` for Gemini
+    models (with optional ThinkingConfig), uses ``client.responses.create``
+    (with reasoning) for GPT-5+ models, and
+    ``client.chat.completions.create`` for all other OpenAI models.
 
     Args:
         client: An ``openai.OpenAI`` client instance.
         model (str): Model identifier, e.g. ``"gpt-4.1-mini-2025-04-14"``.
         messages (list): List of ``{"role": ..., "content": ...}`` dicts.
         reasoning_effort (str): ``"low"`` (default), ``"medium"``, or
-            ``"high"``.  Ignored for non-GPT-5 models.
+            ``"high"``.  Ignored for non-GPT-5 and Gemini models.
+        gemini_client: A ``google.genai.Client`` instance. Required when
+            using a Gemini model.
+        thinking_level (str): Gemini thinking level — ``"minimal"``,
+            ``"low"``, ``"medium"``, or ``"high"``. When ``None`` the
+            model default is used (``"minimal"`` for flash, ``"low"`` for
+            pro). Ignored for non-Gemini models.
 
     Returns:
         str: The assistant's reply text.
     """
+    if _is_gemini_model(model):
+        if gemini_client is None:
+            raise ValueError("gemini_client must be provided for Gemini models.")
+        contents, system_instruction = _convert_messages_for_gemini(messages)
+
+        # Resolve thinking level with per-family defaults
+        resolved_thinking = thinking_level or (
+            GEMINI_FLASH_THINKING_DEFAULT
+            if _is_gemini_flash(model)
+            else GEMINI_PRO_THINKING_DEFAULT
+        )
+        if resolved_thinking not in VALID_THINKING_LEVELS:
+            raise ValueError(
+                f"thinking_level must be one of {VALID_THINKING_LEVELS}, "
+                f"got '{resolved_thinking}'"
+            )
+
+        thinking_cfg = genai_types.ThinkingConfig(thinking_level=resolved_thinking)
+        gen_cfg = genai_types.GenerateContentConfig(
+            thinking_config=thinking_cfg,
+            **(
+                dict(system_instruction=system_instruction)
+                if system_instruction
+                else {}
+            ),
+        )
+        response = gemini_client.models.generate_content(
+            model=model,
+            contents=contents,
+            config=gen_cfg,
+        )
+        return response.text
+
     if reasoning_effort not in VALID_REASONING_EFFORTS:
         raise ValueError(
             f"reasoning_effort must be one of {VALID_REASONING_EFFORTS}, "

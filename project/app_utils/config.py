@@ -9,10 +9,21 @@ models = {
         "o4-mini",
         "gpt-4o-mini-search-preview",
         "gpt-4o-search-preview",
-    ]
+    ],
+    "Gemini models": [
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash-lite-preview",
+        "gemini-3.1-pro-preview",
+    ],
 }
 
 gpt_default = "gpt-4.1-mini-2025-04-14"
 
-REASONING_MODELS_MIN_VERSION = 5  # gpt-5 and above support the responses endpoint
+# gpt-5 and above support the following reasoning efforts
+REASONING_MODELS_MIN_VERSION = 5  
 VALID_REASONING_EFFORTS = ("low", "medium", "high")
+
+# Gemini thinking/reasoning levels (flash default: "minimal", pro default: "low")
+VALID_THINKING_LEVELS = ("minimal", "low", "medium", "high")
+GEMINI_FLASH_THINKING_DEFAULT = "minimal"
+GEMINI_PRO_THINKING_DEFAULT = "low"
