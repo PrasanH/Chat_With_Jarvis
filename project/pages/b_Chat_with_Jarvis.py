@@ -7,7 +7,13 @@ from google import genai
 import app_utils.llm_utils as llm_utils
 import app_utils.folder_rag_utils as rag
 from app_utils import content
-from app_utils.config import models, gpt_default
+from app_utils.config import (
+    models,
+    gpt_default,
+    VALID_THINKING_LEVELS,
+    GEMINI_FLASH_THINKING_DEFAULT,
+    GEMINI_PRO_THINKING_DEFAULT,
+)
 
 load_dotenv()
 
@@ -194,6 +200,21 @@ with st.expander(":gear: Settings", expanded=False):
             help="Only available for GPT-5+ models.",
         )
 
+    if st.session_state.get("provider_select", "GPT") == "Gemini":
+        _selected_model = st.session_state.get("model_select", "")
+        _thinking_default = (
+            GEMINI_FLASH_THINKING_DEFAULT
+            if "flash" in _selected_model.lower()
+            else GEMINI_PRO_THINKING_DEFAULT
+        )
+        st.selectbox(
+            ":bulb: Thinking level",
+            options=list(VALID_THINKING_LEVELS),
+            index=list(VALID_THINKING_LEVELS).index(_thinking_default),
+            key="thinking_level",
+            help="Controls Gemini's internal reasoning depth. Flash default: minimal. Pro default: low.",
+        )
+
 # Determine active system prompt from session state
 _custom = st.session_state.get("custom_prompt", "").strip()
 _preset_key = st.session_state.get(
@@ -333,6 +354,7 @@ if user_input := st.chat_input("Ask JARVIS anything..."):
                 messages=api_messages,
                 reasoning_effort=st.session_state.get("reasoning_effort", "low"),
                 gemini_client=gemini_client,
+                thinking_level=st.session_state.get("thinking_level", None),
             )
         st.markdown(reply)
 

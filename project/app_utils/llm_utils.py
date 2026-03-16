@@ -20,6 +20,9 @@ from app_utils.config import (
     gpt_default,
     REASONING_MODELS_MIN_VERSION,
     VALID_REASONING_EFFORTS,
+    VALID_THINKING_LEVELS,
+    GEMINI_FLASH_THINKING_DEFAULT,
+    GEMINI_PRO_THINKING_DEFAULT,
 )
 
 from langchain_community.llms import HuggingFaceHub
@@ -424,18 +427,25 @@ def _model_supports_reasoning(model: str) -> bool:
     return bool(match and int(match.group(1)) >= REASONING_MODELS_MIN_VERSION)
 
 
+def _is_gemini_flash(model: str) -> bool:
+    """Return True if the Gemini model is a flash variant."""
+    return "flash" in model.lower()
+
+
 def get_llm_reply(
     client,
     model: str,
     messages: list,
     reasoning_effort: str = "low",
     gemini_client=None,
+    thinking_level: str = None,
 ) -> str:
     """
     Send a chat request and return the assistant reply text.
 
-    Routes to Gemini via ``gemini_client.interactions.create`` for Gemini models,
-    uses ``client.responses.create`` (with reasoning) for GPT-5+ models, and
+    Routes to Gemini via ``gemini_client.models.generate_content`` for Gemini
+    models (with optional ThinkingConfig), uses ``client.responses.create``
+    (with reasoning) for GPT-5+ models, and
     ``client.chat.completions.create`` for all other OpenAI models.
 
     Args:
@@ -446,6 +456,10 @@ def get_llm_reply(
             ``"high"``.  Ignored for non-GPT-5 and Gemini models.
         gemini_client: A ``google.genai.Client`` instance. Required when
             using a Gemini model.
+        thinking_level (str): Gemini thinking level — ``"minimal"``,
+            ``"low"``, ``"medium"``, or ``"high"``. When ``None`` the
+            model default is used (``"minimal"`` for flash, ``"low"`` for
+            pro). Ignored for non-Gemini models.
 
     Returns:
         str: The assistant's reply text.
@@ -454,15 +468,32 @@ def get_llm_reply(
         if gemini_client is None:
             raise ValueError("gemini_client must be provided for Gemini models.")
         contents, system_instruction = _convert_messages_for_gemini(messages)
-        cfg = (
-            genai_types.GenerateContentConfig(system_instruction=system_instruction)
-            if system_instruction
-            else None
+
+        # Resolve thinking level with per-family defaults
+        resolved_thinking = thinking_level or (
+            GEMINI_FLASH_THINKING_DEFAULT
+            if _is_gemini_flash(model)
+            else GEMINI_PRO_THINKING_DEFAULT
+        )
+        if resolved_thinking not in VALID_THINKING_LEVELS:
+            raise ValueError(
+                f"thinking_level must be one of {VALID_THINKING_LEVELS}, "
+                f"got '{resolved_thinking}'"
+            )
+
+        thinking_cfg = genai_types.ThinkingConfig(thinking_level=resolved_thinking)
+        gen_cfg = genai_types.GenerateContentConfig(
+            thinking_config=thinking_cfg,
+            **(
+                dict(system_instruction=system_instruction)
+                if system_instruction
+                else {}
+            ),
         )
         response = gemini_client.models.generate_content(
             model=model,
             contents=contents,
-            config=cfg,
+            config=gen_cfg,
         )
         return response.text
 
