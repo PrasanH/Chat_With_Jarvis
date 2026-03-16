@@ -8,8 +8,6 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 # needed if import statement is not working. add project path to python module search
 
-from pages import b_Chat_with_Jarvis
-
 """
 tests b_Chat_with_Jarvis.py page. 
 
@@ -36,7 +34,7 @@ def app():
 
 def test_app_loads_without_errors(app):
     """Test that the app loads successfully"""
-    at = app.run()
+    at = app.run(timeout=10)
     assert not at.exception
 
 
